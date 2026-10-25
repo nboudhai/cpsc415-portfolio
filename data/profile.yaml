@@ -1,0 +1,89 @@
+# data/profile.yaml
+# Every TODO_FILL_IN marker below must be replaced before deploy.
+# `python scripts/validate_profile.py` warns on each marker (exit 0);
+# `python scripts/validate_profile.py --strict` and the deploy workflow
+# fail on each marker (exit 1).
+
+profile:
+  name: "Nadia Boudhaim Maguire"
+  tagline: "TODO_FILL_IN one-line tagline shown under the name"
+  location: "Hartford, Connecticut"
+  pronouns: "she/her"
+
+about:
+  short_bio: "TODO_FILL_IN short bio (~2 sentences) for the About section"
+  long_bio: "TODO_FILL_IN longer bio (~1 paragraph) used as chatbot grounding material"
+
+projects:
+  - id: "TODO_FILL_IN-project-slug-kebab-case"
+    title: "TODO_FILL_IN project title"
+    role: "TODO_FILL_IN your role (e.g. Solo developer, Backend lead)"
+    dates:
+      start: "TODO_FILL_IN YYYY-MM"
+      end: "present"
+    links:
+      - label: "Repo"
+        url: "https://TODO_FILL_IN.example.com/repo"
+    technologies:
+      - "TODO_FILL_IN language or framework"
+      - "TODO_FILL_IN another language or framework"
+    what_is_this: "TODO_FILL_IN plain-language description of the project"
+    why_this_choice: "TODO_FILL_IN why this technology, design, or approach"
+    what_breaks: "TODO_FILL_IN failure mode or known limitation"
+    what_did_i_learn: "TODO_FILL_IN the most useful thing you took away"
+
+research:
+  - id: "TODO_FILL_IN-research-slug-kebab-case"
+    title: "TODO_FILL_IN research title"
+    venue: "TODO_FILL_IN conference, journal, or course"
+    year: 2026
+    abstract: "TODO_FILL_IN optional abstract used as chatbot grounding material"
+    links:
+      - label: "Write-up"
+        url: "https://TODO_FILL_IN.example.com/write-up"
+
+resume:
+  education:
+    - institution: "Trinity College, CT"
+      degree: "Bachelor of Science"
+      field: "Computer Science and Physics"
+      dates:
+        start: "2024-09"
+        end: "present"
+      notes: "TODO_FILL_IN optional one-line note"
+
+  experience:
+    - org: "TODO_FILL_IN organization name"
+      role: "TODO_FILL_IN your role"
+      dates:
+        start: "TODO_FILL_IN YYYY-MM"
+        end: "TODO_FILL_IN YYYY-MM or present"
+      bullets:
+        - "TODO_FILL_IN one short bullet (2-5 total)"
+        - "TODO_FILL_IN another short bullet"
+
+interests:
+  - name: "TODO_FILL_IN interest name"
+    description: "TODO_FILL_IN one or two sentences"
+
+  - name: "TODO_FILL_IN another interest"
+    description: "TODO_FILL_IN one or two sentences"
+
+skills:
+  - name: "TODO_FILL_IN a skill you have shipped"
+    level: "shipped"
+    context: "TODO_FILL_IN where you used it (one line)"
+  - name: "TODO_FILL_IN a skill you are actively learning"
+    level: "learning"
+    context: "TODO_FILL_IN what you are doing to learn it (one line)"
+
+not_yet:
+  - topic: "TODO_FILL_IN a skill or tool you have deliberately deprioritized"
+    why: "TODO_FILL_IN one real sentence (>=40 chars) on why this is not a priority right now."
+
+contact:
+  email: "TODO_FILL_IN@example.com"
+  linkedin: "https://www.linkedin.com/in/TODO_FILL_IN"
+  links:
+    - label: "GitHub"
+      url: "https://github.com/TODO_FILL_IN"

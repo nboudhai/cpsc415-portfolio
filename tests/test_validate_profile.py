@@ -10,6 +10,11 @@ Coverage:
   * ``TODO_FILL_IN`` markers: warnings by default (exit 0), fatal under
     ``--strict`` (exit 1); YAML comments are scanned; the lowercase word
     "placeholder" in a real field is *not* treated as a marker.
+  * PR review fixes: whitespace stripping (``str_strip_whitespace=True``),
+    ``DateRange`` YYYY-MM format and start-not-after-end, LinkedIn exact
+    host match (not substring, not lookalike), no overlap between skill
+    names and ``not_yet`` topics (case-insensitive), unique project and
+    research ids.
 """
 
 from __future__ import annotations
@@ -199,6 +204,102 @@ research:
     title: "Bad Year"
     venue: "Somewhere"
     year: "not-a-number"
+
+resume:
+  education: []
+  experience: []
+
+interests: []
+
+skills: []
+
+not_yet:
+  - topic: "Kubernetes"
+    why: "I have not needed it for any of my shipped projects, and the learning curve looks steep."
+
+contact:
+  email: "nadia@example.com"
+  linkedin: "https://www.linkedin.com/in/nadia"
+"""
+
+
+# A profile with two projects sharing the same id. The unique-id validator
+# on ``Profile`` should reject it.
+DUP_PROJECT_ID = """\
+profile:
+  name: "Nadia Boudhaim Maguire"
+  tagline: "CS student"
+  location: "Hartford, CT"
+
+about:
+  short_bio: "Short."
+  long_bio: "Long."
+
+projects:
+  - id: "same"
+    title: "Project One"
+    role: "Solo developer"
+    dates:
+      start: "2025-09"
+      end: "present"
+    what_is_this: "A."
+    why_this_choice: "B."
+    what_breaks: "C."
+    what_did_i_learn: "D."
+  - id: "same"
+    title: "Project Two"
+    role: "Solo developer"
+    dates:
+      start: "2025-09"
+      end: "present"
+    what_is_this: "A."
+    why_this_choice: "B."
+    what_breaks: "C."
+    what_did_i_learn: "D."
+
+research: []
+
+resume:
+  education: []
+  experience: []
+
+interests: []
+
+skills: []
+
+not_yet:
+  - topic: "Kubernetes"
+    why: "I have not needed it for any of my shipped projects, and the learning curve looks steep."
+
+contact:
+  email: "nadia@example.com"
+  linkedin: "https://www.linkedin.com/in/nadia"
+"""
+
+
+# A profile with two research entries sharing the same id. The unique-id
+# validator on ``Profile`` should reject it.
+DUP_RESEARCH_ID = """\
+profile:
+  name: "Nadia Boudhaim Maguire"
+  tagline: "CS student"
+  location: "Hartford, CT"
+
+about:
+  short_bio: "Short."
+  long_bio: "Long."
+
+projects: []
+
+research:
+  - id: "same"
+    title: "Paper One"
+    venue: "Conference A"
+    year: 2025
+  - id: "same"
+    title: "Paper Two"
+    venue: "Conference B"
+    year: 2026
 
 resume:
   education: []
@@ -410,4 +511,200 @@ def test_word_placeholder_passes(tmp_path: Path) -> None:
     )
     assert rc_strict == 0, (
         f"strict should also pass when 'placeholder' is in real text, got {rc_strict}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# PR review fixes
+# ---------------------------------------------------------------------------
+
+
+# Whitespace: ``str_strip_whitespace=True`` is the linchpin of the
+# ``min_length=1`` and ``why ≥40`` guarantees. A whitespace-only string must
+# be treated as empty.
+
+
+def test_whitespace_only_tagline_fails(tmp_path: Path) -> None:
+    """A whitespace-only tagline should be treated as empty."""
+    body = MINIMAL_VALID.replace(
+        'tagline: "CS student"',
+        'tagline: "   "',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors, "whitespace-only tagline should fail min_length=1"
+    assert any("tagline" in e for e in errors), (
+        f"errors should mention tagline, got: {errors}"
+    )
+
+
+def test_leading_trailing_whitespace_is_stripped(tmp_path: Path) -> None:
+    """Leading/trailing whitespace is stripped before the min_length check."""
+    # '   CS student   ' strips to 'CS student' (10 chars) and passes.
+    body = MINIMAL_VALID.replace(
+        'tagline: "CS student"',
+        'tagline: "   CS student   "',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors == [], (
+        f"padded tagline should strip and pass; got: {errors}"
+    )
+
+
+# DateRange: YYYY-MM format and start-not-after-end. ``end`` may also be
+# the literal ``"present"``.
+
+
+def test_date_start_wrong_format_fails(tmp_path: Path) -> None:
+    """A start that is not YYYY-MM must be rejected."""
+    body = PASSING.replace(
+        '      start: "2025-09"\n      end: "present"',
+        '      start: "not-a-date"\n      end: "present"',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors, "non-YYYY-MM start should fail"
+    assert any("start" in e or "dates" in e for e in errors), (
+        f"errors should mention start/dates, got: {errors}"
+    )
+
+
+def test_date_end_wrong_format_fails(tmp_path: Path) -> None:
+    """An end that is neither YYYY-MM nor ``present`` must be rejected."""
+    body = PASSING.replace(
+        '      start: "2025-09"\n      end: "present"',
+        '      start: "2025-09"\n      end: "2024"',  # no month
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors, "non-YYYY-MM end should fail"
+    assert any("end" in e or "dates" in e for e in errors), (
+        f"errors should mention end/dates, got: {errors}"
+    )
+
+
+def test_date_end_present_passes(tmp_path: Path) -> None:
+    """``end: present`` is the special token for an open-ended range."""
+    # PASSING's project already uses ``end: present``; this asserts the
+    # DateRange validator accepts the literal.
+    errors = validate(_write(tmp_path, PASSING))
+    assert errors == [], f"end='present' must pass; got: {errors}"
+
+
+def test_date_start_after_end_fails(tmp_path: Path) -> None:
+    """A start that comes after end is incoherent; reject it."""
+    body = PASSING.replace(
+        '      start: "2025-09"\n      end: "present"',
+        '      start: "2025-09"\n      end: "2024-01"',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors, "start after end should fail"
+    assert any("after" in e or "start" in e for e in errors), (
+        f"errors should mention start-not-after-end, got: {errors}"
+    )
+
+
+def test_date_month_out_of_range_fails(tmp_path: Path) -> None:
+    """Month must be 01–12. ``2026-13`` and ``2026-00`` are not real months."""
+    for bad in ("2026-13", "2026-00"):
+        body = PASSING.replace(
+            '      start: "2025-09"\n      end: "present"',
+            f'      start: "{bad}"\n      end: "present"',
+        )
+        errors = validate(_write(tmp_path, body))
+        assert errors, f"{bad} should fail (out-of-range month)"
+        assert any("start" in e or "dates" in e for e in errors), (
+            f"errors should mention start/dates for {bad}, got: {errors}"
+        )
+
+
+# LinkedIn: exact host match on ``linkedin.com`` or a ``*.linkedin.com``
+# subdomain. ``notlinkedin.com`` and ``linkedin.com.example.org`` look
+# similar but are NOT linkedin.
+
+
+def test_linkedin_lookalike_host_fails(tmp_path: Path) -> None:
+    """``notlinkedin.com`` and ``linkedin.com.example.org`` are not linkedin."""
+    for bad in (
+        "https://notlinkedin.com/in/nadia",
+        "https://linkedin.com.example.org/in/nadia",
+        "https://example.com/linkedin.com/in/nadia",
+    ):
+        body = MINIMAL_VALID.replace(
+            'linkedin: "https://www.linkedin.com/in/nadia"',
+            f'linkedin: "{bad}"',
+        )
+        errors = validate(_write(tmp_path, body))
+        assert errors, f"{bad} should fail"
+        assert any("linkedin" in e for e in errors), (
+            f"errors should mention linkedin for {bad}, got: {errors}"
+        )
+
+
+def test_linkedin_subdomain_passes(tmp_path: Path) -> None:
+    """A ``*.linkedin.com`` subdomain (e.g. www) is fine."""
+    body = MINIMAL_VALID.replace(
+        'linkedin: "https://www.linkedin.com/in/nadia"',
+        'linkedin: "https://www.linkedin.com/in/nadia"',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors == [], (
+        f"www.linkedin.com should pass (it's *.linkedin.com); got: {errors}"
+    )
+
+
+def test_linkedin_apex_passes(tmp_path: Path) -> None:
+    """``linkedin.com`` itself (no subdomain) is also fine."""
+    body = MINIMAL_VALID.replace(
+        'linkedin: "https://www.linkedin.com/in/nadia"',
+        'linkedin: "https://linkedin.com/in/nadia"',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors == [], (
+        f"linkedin.com (apex) should pass; got: {errors}"
+    )
+
+
+# Skill / not_yet overlap: case-insensitive. The chatbot grounding prompt
+# filters by ``level`` (shipped vs learning) so a topic appearing in both
+# buckets is contradictory.
+
+
+def test_skill_not_yet_overlap_case_insensitive_fails(tmp_path: Path) -> None:
+    """``Rust`` in skills and ``rust`` in not_yet must fail (case-insensitive)."""
+    # PASSING has skill "Rust" (learning); we move its not_yet topic to "rust".
+    body = PASSING.replace(
+        '- topic: "Kubernetes in production"',
+        '- topic: "rust"',
+    )
+    errors = validate(_write(tmp_path, body))
+    assert errors, "Rust in skills + rust in not_yet must fail"
+    assert any("skills" in e or "not_yet" in e or "Rust" in e for e in errors), (
+        f"errors should mention overlap, got: {errors}"
+    )
+
+
+def test_skill_not_yet_no_overlap_passes(tmp_path: Path) -> None:
+    """Distinct topics in skills and not_yet must pass."""
+    errors = validate(_write(tmp_path, PASSING))
+    assert errors == [], (
+        f"PASSING (Rust learning, Kubernetes not_yet) must pass; got: {errors}"
+    )
+
+
+# Unique project / research ids.
+
+
+def test_duplicate_project_id_fails(tmp_path: Path) -> None:
+    """Two projects sharing the same id must be rejected."""
+    errors = validate(_write(tmp_path, DUP_PROJECT_ID))
+    assert errors, "duplicate project id should fail"
+    assert any("duplicate" in e or "project" in e for e in errors), (
+        f"errors should mention duplicate project id, got: {errors}"
+    )
+
+
+def test_duplicate_research_id_fails(tmp_path: Path) -> None:
+    """Two research entries sharing the same id must be rejected."""
+    errors = validate(_write(tmp_path, DUP_RESEARCH_ID))
+    assert errors, "duplicate research id should fail"
+    assert any("duplicate" in e or "research" in e for e in errors), (
+        f"errors should mention duplicate research id, got: {errors}"
     )

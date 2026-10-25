@@ -19,7 +19,8 @@ projects:
     title: "TODO_FILL_IN project title"
     role: "TODO_FILL_IN your role (e.g. Solo developer, Backend lead)"
     dates:
-      start: "TODO_FILL_IN YYYY-MM"
+      # 0001-01 is a structurally valid YYYY-MM placeholder; replace before deploy.
+      start: "0001-01"  # TODO_FILL_IN replace with real YYYY-MM
       end: "present"
     links:
       - label: "Repo"
@@ -56,8 +57,8 @@ resume:
     - org: "TODO_FILL_IN organization name"
       role: "TODO_FILL_IN your role"
       dates:
-        start: "TODO_FILL_IN YYYY-MM"
-        end: "TODO_FILL_IN YYYY-MM or present"
+        start: "0001-01"  # TODO_FILL_IN replace with real YYYY-MM
+        end: "0001-01"  # TODO_FILL_IN replace with real YYYY-MM or 'present'
       bullets:
         - "TODO_FILL_IN one short bullet (2-5 total)"
         - "TODO_FILL_IN another short bullet"

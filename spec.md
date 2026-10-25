@@ -9,6 +9,7 @@ This spec implements `intent/portfolio.md` (approved 2026-10-04 by Nadia Boudhai
 
 ## Open questions resolved by this spec
 
+- **Static-site host (GitHub Pages vs Cloudflare Pages)** → **Cloudflare Pages.** The intent specified GitHub Pages for the static site and a separate Cloudflare deployment for the proxy. Once the proxy is colocated as a Pages Function (next entry), splitting the static site off to GitHub Pages means two deploy pipelines and two sets of secrets for no benefit — Cloudflare Pages serves static sites natively. Net change: one project, one deploy, one secret store.
 - **Cloudflare Workers vs Pages Functions** → **Pages Functions.** Reason: the static site lives on a Pages project; the proxy lives next to it, shares the same secrets, and ships in the same deploy. Workers would add a second project to manage.
 - **Data file format** → **YAML.** Reason: hand-editable, comments allowed, structured, and Pydantic parses it natively. JSON would also work but YAML is friendlier for the prose-heavy fields in this file.
 - **YAML parser** → **Pydantic** (Python). Used in two places:
@@ -137,6 +138,13 @@ interests:                      # list of named topics outside work
   - name: string
     description: string         # one or two sentences
 
+skills:                         # list of skills, with explicit shipped vs learning tier
+  - name: string                # skill or tool name
+    level: "shipped" | "learning"
+                                 # shipped = used in a shipped project
+                                 # learning = currently working on (these ARE the learning goals)
+    context: string             # one line: where used (shipped), or what triggered it (learning)
+
 not_yet:                        # see "Not yet inventory template" below
   - topic: string
     why: string
@@ -155,27 +163,40 @@ contact:
 `scripts/validate_profile.py` enforces:
 - Every entry in `projects` has non-empty `what_is_this`, `why_this_choice`, `what_breaks`, `what_did_i_learn`. A missing or empty field fails CI.
 - Every entry in `research` has non-empty `id`, `title`, `venue`, `year`.
-- `not_yet` is present (may be empty).
+- `not_yet` has at least one entry. Each entry has non-empty `topic` and `why` (where `why` is at least 40 characters — one real sentence, not a token).
 - `contact.email` and `contact.linkedin` are present and look like a `mailto:` target and a `linkedin.com` URL respectively.
 
 ## "Not yet" inventory template
 
-A section in the data file for things Nadia plans to do or learn but has not yet. Items here are short, forward-looking, and intentionally low-pressure: they are *not* project entries (no `what_breaks` etc. — there is nothing to break yet). They surface in the chatbot so a recruiter can ask "what's next for you?" and get a real answer.
+A section in the data file for skills and tools Nadia has **deliberately deprioritized** — things she is aware of, has likely encountered, and is *not* currently working on. This is distinct from `skills.level == "learning"` (actively learning now; these are the learning goals) and from `projects` (already shipped).
 
-Each item is one YAML mapping with three required fields:
+The three tiers, in chatbot terms:
+
+- **`projects`** + **`skills.level == "shipped"`** — built it, can talk about what broke and what was learned.
+- **`skills.level == "learning"`** — actively working on it now; these are the "learning goals."
+- **`not_yet`** — deliberately *not* now; `why` explains the trade-off.
+
+Items here are intentionally low-pressure. They surface in the chatbot so a visitor can ask "what's *not* on your roadmap?" and get a real, honest answer — including the reason a thing is *not* a priority. They are *not* project entries (no `what_breaks` etc. — there is nothing to break yet).
+
+Each item is one YAML mapping with two required fields and one optional field:
 
 ```yaml
 not_yet:
-  - topic: "Distributed systems on bare metal"     # what it is, in one line
-    why: "Most of my coursework is web-shaped; I want to know what the OS layer actually buys me."
-    first_step: "Read the first three chapters of 'Designing Data-Intensive Applications' and reproduce one example on a Raspberry Pi."
+  - topic: "Kubernetes in production"
+    why: "I have not needed it for any of my shipped projects, and the learning curve looks steep for what I'd gain right now."
+    # first_step is optional — only set if there is a concrete trigger that
+    # would change the priority; otherwise omit.
 ```
 
-- `topic` (string, required): short label, like a TODO subject.
-- `why` (string, required): one or two sentences on why this is on the list.
-- `first_step` (string, required): one concrete, small action that would move the item forward. The chatbot may quote `first_step` verbatim when asked.
+- `topic` (string, required): the skill or tool.
+- `why` (string, required, ≥40 chars): the reason this is *deliberately not* a priority right now. This is the field the chatbot should quote or paraphrase when asked.
+- `first_step` (string, optional): only set if there is a concrete trigger that would change the priority. The chatbot may quote `first_step` verbatim if present.
 
-The chatbot must treat `not_yet` items as *plans*, not *achievements*. If asked "have you built X?" and X is only in `not_yet`, the answer is "not yet — here is what I plan to do" and the `first_step`, not a description as if it were done.
+The chatbot must treat `not_yet` items as **deprioritized, not in progress, not done**. Concretely:
+
+- If asked "have you built X?" and X is only in `not_yet`: *"No — that's something I've deliberately not prioritized. Here's why…"*, citing `why`. Never describe it as if it were done.
+- If asked "are you learning X?" and X is only in `not_yet`: *"Not currently — I've deprioritized it for now. Here's why…"*. Never list it alongside `skills.level == "learning"` items.
+- If asked "what's next for you?": the answer is from `skills.level == "learning"` and `not_yet.first_step` (when present), *not* from `not_yet` as a whole.
 
 ## Language and model decisions
 
@@ -291,3 +312,5 @@ Added by this spec:
 - Multi-language support (the page and chatbot are English-only).
 
 **Approved by:** *Nadia Boudhaim Maguire, 2026-10-04*
+
+**Amended:** *2026-10-25 — static-site host recorded (item 2); schema updated to add `skills` and to redefine `not_yet` as deliberately deprioritized skills/tools (item 3).*

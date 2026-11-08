@@ -407,10 +407,14 @@ Numbered like the behaviors above; these are what the test stage checks.
     expected text to check against, so the page shows what was heard; a
     mishearing is visible there.
 11. **A misheard question falls to the refusal, not to an invention.**
-12. **Tests that call a model are skipped when no key is set.** The checker's
-    tests run with no key at all; the billed eval is skipped, not failed.
+12. **Tests that call a model are skipped unless the key is set and
+    `VOICE_EVAL=1`.** The checker's tests need neither; the billed eval runs
+    only when `OPENROUTER_API_KEY` is set **and** `VOICE_EVAL=1`, and is
+    skipped, not failed, otherwise. An ordinary test run never bills.
 13. **One transcription per clip, one speech call per answer.** No model call
-    inside a loop of tests.
+    inside a loop of tests. A set run processes every clip even after one
+    fails, then exits 1 if any clip failed and 0 otherwise, so a failure never
+    causes a clip to be transcribed twice.
 14. **The key stays on the server.** The browser sends only audio; the key is
     read from the environment when running locally and from the host's secret
     store once deployed, and reaches neither the page nor the network tab.
@@ -420,6 +424,16 @@ Numbered like the behaviors above; these are what the test stage checks.
 16. **Every turn and every clip is recorded.** The text, the audio seconds, the
     characters, the bytes, the cost, and the seconds the call took go into
     `voice/CHECKS.md`.
+17. **A recording the model rejects is an error, not an answer.** If the
+    provider rejects the audio — a format it will not take, a truncated
+    recording — the turn ends there: no chat call and no speech call are made,
+    no audio is written, and `/api/voice` returns 502 with a plain message
+    ("The recording could not be read. Please try again or type your
+    question."). The page shows that message in place of an answer instead of
+    an empty transcript. The provider's message is logged on the server and
+    never sent to the browser, which is what the browser check asserts, and the
+    key is never logged either. A rejected call records its transcription cost
+    as "none reported".
 
 ## Failure handling
 
@@ -466,3 +480,9 @@ Added by this spec:
 **Amended:** *2026-10-25 — static-site host recorded (item 2); schema updated to add `skills` and to redefine `not_yet` as deliberately deprioritized skills/tools (item 3).*
 
 **Amended:** *2026-11-08 — Week 7: spoken interface section added.*
+
+**Amended:** *2026-11-08 — Week 7 behavior 12: the billed tests also require VOICE_EVAL=1.*
+
+**Amended:** *2026-11-08 — Week 7 behavior 13: a set run never stops early and exits 1 if any clip failed.*
+
+**Amended:** *2026-11-08 — Week 7 behavior 17: a rejected recording ends the turn with a plain 502 and no provider message in the browser.*

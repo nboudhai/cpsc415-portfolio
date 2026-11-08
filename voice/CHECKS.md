@@ -45,6 +45,12 @@ that decodes `spec.md` as cp1252, and some UTF-8 characters (for example "←")
 contain a byte cp1252 cannot decode. If such a character entered `spec.md`, the
 guard would crash with exit 1, and a crashed guard fails open.
 
+### Clip ordering
+
+The clip text was drafted before recording. `voice/clips/expected.json` was
+committed (1a52185) after the clips were recorded but before any model heard
+them; no transcription had been run at that point.
+
 ### Agent model
 
 `minimax/minimax-m3`, launched with `scripts/orclaude.bat`

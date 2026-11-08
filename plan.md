@@ -92,4 +92,276 @@ This plan is small enough to keep on one branch with one agent. Two places where
 
 No worktree, no parallel feature branches. The repo rule is one feature per PR, and the feature here is "portfolio site v1."
 
+## Week 7
+
+The voice interface: a visitor records a question, the server transcribes it,
+the chatbot answers from the profile, and the answer is spoken back. Built in
+`voice/`, on the stand-in described in `spec.md` §"Week 7: spoken interface" —
+the course example at `../../ai-integration-course/examples/voice-loop/profile.json`
+and that example's answer step — because the real chatbot does not exist yet.
+The typed route is `/api/chat`, the voice route is `/api/voice`, and both call
+the same `answer()` function. Paths in this section are relative to `voice/`
+unless a command says otherwise.
+
+### Files to create or change
+
+| File | Purpose |
+|---|---|
+| `voice/check.py` | The checker, plain code and no key: word error rate against an expected text, the words that must survive, and the empty-transcript verdict. Written from `spec.md`, not copied; the example is read for request shapes only. |
+| `voice/refusal.py` | The refusal template — one constant — plus its two renderings: the screen text (email and LinkedIn link clickable) and the spoken text (the same message with the LinkedIn URL replaced by "the link is on screen"). Imports nothing from the SDK, so the no-key test imports this module alone. |
+| `voice/answer.py` | The one `answer()` function: the stand-in's system prompt (name-agnostic, `OUT_OF_SCOPE`, no URLs, no markdown, two or three sentences), the chat call, and the replacement of `OUT_OF_SCOPE` with the refusal. Run from the command line with `--ask` and `--out`, it makes one chat call, writes the answer text, and prints the cost. |
+| `voice/transcribe.py` | One clip, or a whole `expected.json` set, through OpenRouter's transcription endpoint. Prints the text, the audio seconds, the cost, the seconds the call took, and the checker's verdict. Over a set it processes every clip even after one fails, then exits 1 if any clip failed and 0 otherwise, so a failure never causes a clip to be transcribed twice. |
+| `voice/speak.py` | Text to an MP3, to a WAV when the output name ends in `.wav` (asks for PCM and frames it with `wave`), or to the text in a file with `--in`. Prints the characters, the bytes, the cost, and the seconds. |
+| `voice/server.py` | The loop: `GET /` serves the page; `POST /api/voice` takes the recording and returns the transcript, the answer, the audio as base64, and the three costs; `POST /api/chat` takes the typed question and answers through the same function. The 10 MB body cap and the 415 for an unknown audio type live here, and so does the rejection path: a recording the provider will not take ends the turn with a 502 and a plain message, the provider's message going to the server log and never to the browser. |
+| `voice/index.html` | The page: a record button that stops itself at 30 seconds, a file picker as the fallback, the transcript, the answer, the audio, and the error message — a refused recording shows the server's plain message where the answer would go, instead of an empty transcript. No framework, no bundler. |
+| `voice/tests/test_check.py` | The no-key tests of the checker: a perfect transcript scores zero; one substituted word in thirteen scores one thirteenth; the empty reply scores one and is reported, not raised; a name that must survive is reported even when the rate is within tolerance; a number read as words is a miss; spacing and case do not count. |
+| `voice/tests/test_refusal.py` | The no-key tests of the refusal: the constant matches `spec.md` word for word; a reply containing `OUT_OF_SCOPE` anywhere is replaced whole; the spoken text carries no URL; the screen text carries the email and the LinkedIn link. |
+| `voice/tests/test_loop.py` | The no-key tests of the loop, with the model call faked: a non-audio speech reply raises and writes no file; an empty transcript skips both the chat and the speech call; a body over 10 MB is refused; an unknown audio type gets 415; a recording the provider rejects returns 502 with the plain message, makes no chat call and no speech call, writes no audio, and puts the provider's message in the server log and not in the reply. |
+| `voice/tests/test_transcribe.py` | The no-key tests of the set run, with the transcription call faked: every clip in the set is processed even after one fails, the run exits 1 when any clip failed and 0 when none did, and no clip is transcribed twice. One clip's transcription raises, as a provider rejection does: it is recorded as a failed clip, the rest of the set carries on, and the run still exits 1. |
+| `voice/tests/test_eval.py` | The billed eval: each clip transcribed once on each of the two models and checked, plus one chat call and one speech call. Runs only when `OPENROUTER_API_KEY` is set **and** `VOICE_EVAL=1`; otherwise skipped, not failed. An ordinary `pytest` run never bills. The set run's exit code is covered without a key in `test_transcribe.py`. |
+| `voice/test_browser.py` | The Playwright check: uploads a clip through the page, waits for the spoken answer, asserts the browser never saw the key or the provider. Its last three assertions are the submission's acceptance test, and the run goes in `voice/CHECKS.md`. It also checks the page's error display, using an unmapped audio type so the run costs nothing: the server refuses with 415 and the page shows the message instead of an empty transcript. |
+| `voice/clips/expected.json` | *(already committed)* The expected text for `own-01.m4a` and `own-02.m4a`, written by a person before any model heard the clips. |
+| `voice/clips/own-01.m4a`, `voice/clips/own-02.m4a` | *(already committed)* Nadia's own voice, recorded on Windows Sound Recorder. |
+| `voice/speaks/answer.txt` | The exact answer text the two voices spoke, written by the one chat call. Committed, so the spoken files can be checked against it. |
+| `voice/speaks/answer-class.mp3`, `voice/speaks/answer-eleven.mp3` | The two spoken answers, committed: the submission requires them at the `week07-submitted` tag. |
+| `voice/CHECKS.md` | The record: one line per clip per model, the chat call's question, text, and cost, one line per voice, the one-turn section with the three costs and the total, the browser-check run, and the key check with its harmless matches listed as they are found. A rejected call's transcription cost is recorded as "none reported", because the provider reports no usage for a call it refused. |
+| `.gitignore` | Add `voice/last-answer.mp3` only — the server's transient output of the last spoken answer, regenerated per turn and not evidence. |
+
+### Order of work
+
+1. **Approve the plan.** The spec's Week 7 section is approved; the plan
+   approval is the remaining gate. Commit `Approve plan (week 7)`. No code
+   before it.
+2. **The checker, tests first.** Write `voice/tests/test_check.py` before
+   `voice/check.py`, watch it fail, then write the checker and watch it pass.
+   *Proof:* `pytest voice/tests/test_check.py -q` green with no key set and
+   nothing billed.
+3. **The refusal and the loop, tests first.** The same order for
+   `voice/tests/test_refusal.py` and `voice/tests/test_loop.py` against
+   `voice/refusal.py`, `voice/answer.py`, and `voice/server.py`, with the model
+   call faked. *Proof:* green, no key, no billed call.
+4. **The transcriber and the speaker.** Write `voice/transcribe.py` and
+   `voice/speak.py`, and write `voice/tests/test_transcribe.py` first: with the
+   transcription call faked, it asserts that every clip in the set is processed
+   even after one fails, that a clip whose transcription raises — as a
+   provider rejection does — is recorded as a failed clip and the set carries
+   on, that the run exits 1 if any clip failed and 0 if none did, and that a
+   failed clip is never transcribed twice. *Proof:* the first eval command —
+   `python transcribe.py --set clips/expected.json --model
+   openai/whisper-large-v3-turbo --out clips/transcripts-whisper-own.json` — is
+   the proof: it prints one line per clip with the text, the audio seconds, the
+   cost, the seconds, and the checker's verdict, and its exit code is 1 if any
+   of Nadia's clips failed. It is the only transcription of Nadia's clips on
+   that model; no separate call is made to test the code.
+5. **The rest of the clip eval.** The remaining three transcription commands:
+   the course fixtures on both models, and Nadia's clips on Scribe.
+   *Proof:* `voice/CHECKS.md` §"Clips" has one line per clip per model — five
+   clips, two models, ten lines. Commit `Voice: own clips transcribed on two
+   models`.
+6. **The chatbot's answer, then the answer spoken, two voices.** One chat call
+   through `answer()` for own-01's question — "What broke in your receipt
+   reader project, and which skills from CPSC 415 have you actually shipped?"
+   Its text and cost go in `voice/CHECKS.md`, and that exact text is what
+   `speak.py` speaks with both voices: one speech call per model. Listen to
+   both.
+   *Proof:* `voice/CHECKS.md` §"Answer" has the question, the text, and the
+   cost; §"Speaks" has the characters, the bytes, the cost, and what each
+   voice did with Nadia's name and the course number, and names
+   `speaks/answer.txt` as the text it spoke; `voice/speaks/` holds the two
+   files. Commit `Voice: the answer spoken, two voices`.
+7. **The loop in the server.** `voice/index.html` and the server wired to the
+   page. *Proof:* `POST /api/voice` returns the transcript, the answer, the
+   audio, and the three costs; `POST /api/chat` answers the same question
+   through the same function; a recording the provider rejects returns 502
+   with the plain message and no audio, and the page shows it; the no-key loop
+   tests still pass.
+8. **The browser check, the one turn, and the key check.** *Proof:*
+   `voice/CHECKS.md` §"Browser check" carries the run and the last three
+   assertions, §"One turn" carries the transcript, the answer, the three costs,
+   and the total, and §"Key check" carries the empty real-key search and the
+   harmless matches listed as they are found.
+   Commit `Voice: the loop, with the browser check`; tag `week07-submitted`.
+
+### Risks
+
+1. **A green test run with skips is not a passed eval.** The key is set in this
+   session, so "no key" is not what holds the billed tests back — `VOICE_EVAL=1`
+   is, and it has to be set alongside the key. Without both, the billed tests
+   skip, and a skip is not a failure, so `pytest -q` can be green with nothing
+   transcribed at all. Mitigation: the gate is two conditions, never one; the
+   eval is a different command, run by hand; and the rule is that the eval has
+   run when `voice/CHECKS.md` carries the numbers. See Proof §A and §B.
+2. **The refusal constant drifts from `spec.md`.** The message is in two
+   places, which is where they will disagree. Mitigation: a no-key test asserts
+   the constant matches `spec.md` word for word, so an edit to one without the
+   other fails the suite.
+3. **The stand-in's profile is Sam Rivera, the refusal points to Nadia.** A
+   visitor asking "what have you shipped" gets Sam's projects. Recorded in
+   `voice/CHECKS.md`; ends when `data/profile.yaml` replaces `profile.json`.
+4. **The transcript is wrong in the places that matter** — names and numbers.
+   Mitigation: the `must_contain` list per clip, the stated tolerance, a missing
+   name reported even when the rate is within tolerance, and the live path
+   showing the transcript beside the answer.
+5. **The 30-second cap is page-side.** The server cannot measure a duration
+   without decoding the audio, so a crafted request can exceed it; the 10 MB
+   body cap still applies. The cap bounds latency and abuse for an honest
+   visitor, not a crafted one.
+6. **The browser sends a format the server does not map.** Safari's
+   MediaRecorder sends `audio/mp4`, Chrome `audio/webm`, and Nadia's own clips
+   are `.m4a` recorded on Windows Sound Recorder. An unmapped type gets 415 and
+   the visitor gets nothing. Mitigation: the format map covers all three, and
+   the browser check exercises the path.
+7. **A speech call that returns JSON is saved as audio.** The reply's content
+   type is checked before anything is written; a non-audio reply is an error and
+   nothing is saved. The no-key test fakes the reply and asserts no file
+   appears.
+8. **The spoken refusal carries a URL.** A LinkedIn link read aloud is
+   meaningless. Mitigation: the spoken variant replaces it with "the link is on
+   screen", and a no-key test asserts the spoken text carries no URL.
+9. **The key reaches the repository.** There is no CI yet — the site's CI is
+   plan.md step 8 and does not exist. A plain `sk-or` search is no good here:
+   the repository legitimately contains `sk-or` in harmless places, so the
+   search has to match a key's shape instead. Mitigation: before tagging, run
+   `git grep -nE "sk-or-v1-[0-9a-f]{16,}"` over the working tree and
+   `git log -p | Select-String -Pattern "sk-or-v1-[0-9a-f]{16,}"` over the
+   history; both must be empty, and the harmless `sk-or` strings they do not
+   match are listed by name in `voice/CHECKS.md` as they are found when the
+   check runs — this plan and `voice/CHECKS.md` contain the string themselves,
+   so the list is written at check time rather than fixed in advance. The server
+   logs to the terminal only, never to a file, so provider text in the log can
+   never be committed. A key in any commit is treated as compromised, so it
+   would have to be rotated, not deleted.
+10. **The per-visit cost is not yet in `spec.md`.** The typed cost estimate
+    there covers the chat only. The one-turn total measured in step 8 belongs
+    in `spec.md` under the hosting decision, which is due November 30.
+11. **Behavior 11 has no no-key test.** "A misheard question falls to the
+    refusal, not to an invention" cannot be tested without a model, and a faked
+    model proves only the fake. Its evidence is the code-level whole-reply
+    replacement in `test_refusal.py` — the refusal is written by code, not by
+    the model — and own-02's refusal in the eval, where the question is
+    genuinely out of scope. Blast radius: a mishearing that still lands on a
+    topic the profile answers is answered, truthfully and wrongly, and nothing
+    catches it.
+
+### Proof
+
+Two suites. They are not interchangeable, and a green run of one is not a pass
+of the other.
+
+**A. The no-key suite — nothing is billed.**
+
+Run: `pytest voice/tests -q` with `VOICE_EVAL` unset. The key *is* set in this
+session, so it is `VOICE_EVAL` that holds the billed tests back — the billed
+tests in `test_eval.py` run only when `OPENROUTER_API_KEY` is set **and**
+`VOICE_EVAL=1`, and skip otherwise. An ordinary `pytest` run therefore never
+bills, whether or not a key is present. Under a second, no network. The loop
+tests use a faked client: the model call is a stub that records what it was
+asked, so the assertions are about the code's behaviour, not about a
+provider's answer. `test_transcribe.py` fakes the transcription call the same
+way, so the set run and its exit code are proved without a key.
+
+| Test | What it proves | Cost |
+|---|---|---|
+| A perfect transcript scores 0.0 | the checker's arithmetic on the easy case | $0 |
+| One substituted word in thirteen scores one thirteenth | the rate is edits per expected word, not per word heard | $0 |
+| The empty reply scores 1.0 and is reported, not raised | a failed transcript is a verdict, not a crash | $0 |
+| A name that must survive is reported even when the rate is within tolerance | the named-word check is independent of the rate | $0 |
+| A number read as words is a miss | "four fifteen" is not "415" | $0 |
+| Extra whitespace and capitalization do not count, but a split word does | `Hello,  World!` equals `hello world`; "boot camp" for "bootcamp" is one edit, which is why the course's `expected.json` raises that clip's tolerance to 0.2 | $0 |
+| The refusal constant matches `spec.md` word for word | the two copies of the message agree | $0 |
+| A reply containing `OUT_OF_SCOPE` anywhere is replaced whole | the refusal never arrives spliced into a sentence | $0 |
+| The spoken refusal carries no URL | nothing that cannot be heard is said | $0 |
+| The screen refusal carries the email and the LinkedIn link | the visitor can act on it | $0 |
+| A non-audio speech reply raises and writes no file | a provider's JSON error body never lands as audio | $0 |
+| An empty transcript skips both the chat and the speech call | no model is asked to answer an empty question | $0 |
+| A body over 10 MB is refused | the server's cap | $0 |
+| An unknown audio type gets 415 | the format map | $0 |
+| Every clip in the set is processed even after one fails | a failed clip never causes a second transcription | $0 |
+| The set run exits 1 if any clip failed, 0 if none did | the eval command's exit code carries the verdict | $0 |
+| The billed tests skip when `VOICE_EVAL` is unset, with the key set | an ordinary `pytest` run never bills | $0 |
+| A rejected recording returns 502 with the plain message | the visitor is told the recording could not be read, in code and not in the provider's words | $0 |
+| A rejected recording makes no chat call, no speech call, and writes no audio | the turn ends at the transcription step | $0 |
+| The provider's message is in the server log and not in the reply | the browser never sees the provider, which the browser check asserts | $0 |
+| A clip whose transcription raises is recorded as failed and the set carries on | the set run never stops early | $0 |
+
+What this proves: the checking, the refusal, and the loop's own rules are right
+without a model, so a failure points at the code and not at a bill.
+
+**B. The billed eval — run by hand, with the key.**
+
+Run these in your own terminal, from the repository root, in the virtual
+environment. `$env:OPENROUTER_API_KEY` is already set in this session; it is
+never typed into a file and never appears in a command.
+
+```powershell
+cd voice
+python transcribe.py --set ../../ai-integration-course/examples/voice-loop/clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-fixtures.json
+python transcribe.py --set ../../ai-integration-course/examples/voice-loop/clips/expected.json --model elevenlabs/scribe-v2 --out clips/transcripts-scribe-fixtures.json
+python transcribe.py --set clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-own.json
+python transcribe.py --set clips/expected.json --model elevenlabs/scribe-v2 --out clips/transcripts-scribe-own.json
+python answer.py --ask "What broke in your receipt reader project, and which skills from CPSC 415 have you actually shipped?" --out speaks/answer.txt
+python speak.py --in speaks/answer.txt --out speaks/answer-class.mp3
+python speak.py --in speaks/answer.txt --model elevenlabs/eleven-v4-turbo --voice george --out speaks/answer-eleven.mp3
+```
+
+The chat call comes before the speech calls on purpose: `answer.py` writes
+`speaks/answer.txt` once, and both voices speak that exact file, so what is
+spoken is the chatbot's answer and not a retyped copy of it.
+
+One path or the other, not both: `$env:VOICE_EVAL = "1"` followed by
+`pytest voice/tests/test_eval.py -q` is the same eval behind the gate. Running
+it *and* the commands above transcribes every clip twice and bills it twice.
+
+The exit code is part of the result: `transcribe.py` exits 1 if any clip in the
+set failed and 0 otherwise, so a scripted run of these commands trips on a bad
+clip instead of passing quietly. It never stops early — a failed clip is
+transcribed like every other one, so nothing is billed twice.
+
+What it proves: which transcriber reads Nadia's own voice correctly and whether
+the named words survive — on the fixtures, which are a baseline no person
+spoke, and on her own voice, which is the case that matters; and that the
+answer the two voices speak is the answer `answer()` gave.
+
+What it costs: 13 billed calls — 10 transcriptions (5 clips × 2 models), 1
+chat call, 2 speech calls. At the course's 2026-10-26 prices: Whisper
+$0.00002–$0.00003 a clip, Scribe $0.00034–$0.00057 a clip, the chat call about
+a tenth of a voice turn, the class speech model about $0.0015 for a
+question's worth of characters, ElevenLabs Turbo about $0.0027. Total about a
+cent — comfortably under five cents. The measured numbers go in
+`voice/CHECKS.md`.
+
+**Where the results are recorded, and why a green run is not a pass.**
+
+`pytest` reports the billed eval as *skipped* unless `OPENROUTER_API_KEY` is
+set **and** `VOICE_EVEL=1`, and a skip is not a failure — so `pytest -q` can be
+green with nothing transcribed at all. The eval is therefore the commands
+above, run by hand, and its results are recorded in `voice/CHECKS.md`:
+
+- `## Clips` — one line per clip per model: the file, the model, the word
+  error rate, the words that went missing, the audio seconds, the cost, and the
+  seconds the call took. A clip the provider refused is a failed clip, and its
+  cost is "none reported".
+- `## Answer` — the one chat call: the question, the text it returned, the
+  cost, and the seconds.
+- `## Speaks` — one line per voice: the model, the voice, the text it spoke
+  (which is `speaks/answer.txt`), the characters, the bytes, the cost, the
+  seconds, and what the voice did with Nadia's name and the course number.
+- `## One turn` — the transcript, the answer, the three costs, and the total.
+- `## Browser check` — the run and its last three assertions.
+- `## Key check` — the real-key search over the working tree and over the
+  history, both empty, and the harmless `sk-or` strings listed as they are
+  found when the check runs before the tag. This plan and `voice/CHECKS.md`
+  contain the string themselves, so the list is written at check time rather
+  than fixed in advance. A match that is not one of the named harmless strings
+  is a failure, not a note.
+
+The rule: **the eval has run when `voice/CHECKS.md` carries the numbers, and
+not before.** The transcripts JSON is the receipt; `voice/CHECKS.md` is what a
+reviewer reads. A green `pytest` with no `## Clips` section means the eval did
+not run — and because the key is set in this session, green on its own is not
+evidence of anything: the billed tests skip unless `VOICE_EVAL=1` is set
+beside the key.
+
+**Approved by (Week 7):** Nadia Boudhaim Maguire, 2026-11-08
+
 **Approved by:** Nadia Boudhaim Maguire

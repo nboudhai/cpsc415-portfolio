@@ -1,0 +1,22 @@
+[
+  {
+    "file": "own-01.m4a",
+    "voice": "own voice (Nadia), recorded on Windows Sound Recorder",
+    "text": "What broke in your receipt reader project, and which skills from CPSC 415 have you actually shipped?",
+    "must_contain": [
+      "receipt reader",
+      "415"
+    ]
+  },
+  {
+    "file": "own-02.m4a",
+    "voice": "own voice (Nadia), recorded on Windows Sound Recorder",
+    "text": "My name is Nadia Boudhaim Maguire. What salary would you expect for your first job?",
+    "must_contain": [
+      "Nadia",
+      "Boudhaim",
+      "Maguire",
+      "salary"
+    ]
+  }
+]

@@ -39,4 +39,6 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
   example's answer step as a stand-in, and say so in CHECKS.md.
 
 ## Common mistakes
-None recorded yet. Add one each time the agent gets something wrong.
+- 2026-11-08: Told to show CHECKS.md before saving, the agent saved first and
+  summarized afterward. When a prompt says "show me before you save," wait
+  for approval before writing the file.

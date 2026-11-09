@@ -36,3 +36,15 @@
 
 \- \[ ] Fill in data/profile.yaml and swap it in for the voice stand-in.
 
+\- \[ ] spec.md system prompt: a question the profile only half covers gets no
+
+&#x20;     answer at all. The Week 7 stand-in refused own-01's whole question:
+
+&#x20;     the receipt reader's breaks field is in the profile and the CPSC 415
+
+&#x20;     skills are not, and the prompt's rule is whole-question. Decide the
+
+&#x20;     rule for the real chatbot: answer the part the profile covers, say
+
+&#x20;     plainly that the rest is not in there, and refuse only that.
+

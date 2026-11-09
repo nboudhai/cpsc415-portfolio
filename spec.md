@@ -435,6 +435,16 @@ Numbered like the behaviors above; these are what the test stage checks.
     never sent to the browser, which is what the browser check asserts, and the
     key is never logged either. A rejected call records its transcription cost
     as "none reported".
+18. **The answer's files are ready before the call, and the file the speaker
+    reads is the spoken one.** The chat call is billed, so the command line
+    creates the output folder and proves the file can be written *before* it
+    asks the model anything: a missing folder must not be discovered after the
+    answer has been paid for, and a run whose answer cannot be written must
+    not call the model at all. `--out` holds the spoken rendering, with no URL
+    in it, and the screen rendering — with the email and the LinkedIn link —
+    is written next to it as `answer-screen.txt`. The command line exits 2
+    when it cannot start: no key, or an answer that cannot be written. Nothing
+    is billed.
 
 ## Failure handling
 
@@ -489,3 +499,5 @@ Added by this spec:
 **Amended:** *2026-11-08 — Week 7 behavior 13: the set run also exits 2 when it cannot start because no key is set; nothing is billed.*
 
 **Amended:** *2026-11-08 — Week 7 behavior 17: a rejected recording ends the turn with a plain 502 and no provider message in the browser.*
+
+**Amended:** *2026-11-08 — Week 7 behavior 18: the answer's files are prepared before the billed call, `--out` holds the spoken text, the screen text goes next to it as `answer-screen.txt`, and the command line exits 2 when it cannot start.*

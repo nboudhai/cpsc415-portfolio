@@ -238,6 +238,86 @@ The missing list is empty for the fixture clips even where a word was split: `mu
 
 I could argue for why they spelt Boudhaim as they did, though if I really had to pick one I'd say Boatime. Personally I don't hear 'Mc' in how I say Maguire; it would be very soft if it's there. But McGuire is a common name, so it is very close compared to the Boudhaim versions.
 
+## Answer
+
+One chat call through `answer()` — the same function the typed route and the
+voice route both call — run by hand on 2026-11-08. The question is own-01's:
+
+> What broke in your receipt reader project, and which skills from CPSC 415 have you actually shipped?
+
+The model is `minimax/minimax-m3`, the one `answer()` uses.
+
+### The first call was lost
+
+The command line made the chat call and then crashed writing the answer:
+`voice/speaks/` did not exist, and the write came after the call. The answer
+was paid for and lost with the traceback. **Its cost is unknown** — the
+command line prints the cost only after the write — and the answer was never
+printed or kept.
+
+Both bugs are fixed, and the fix is proved by `voice/tests/test_answer.py`
+with the call faked:
+
+- the output folder is created, and the file proved writable, before the model
+  is asked; a run whose answer cannot be written never calls the model at all;
+- `--out` holds the **spoken** rendering, and the screen rendering goes next
+  to it as `answer-screen.txt`.
+
+### The second call
+
+| | |
+| --- | --- |
+| Question | What broke in your receipt reader project, and which skills from CPSC 415 have you actually shipped? |
+| Model | `minimax/minimax-m3` |
+| Cost | $0.00080076 |
+| The answer | the refusal |
+
+The answer as the visitor reads it — this is what the second run wrote to
+`voice/speaks/answer.txt`, and it was wrong, because the file the speaker
+reads must not carry a URL:
+
+> That's beyond what I have here, but it's exactly the kind of thing Nadia likes answering in her own words. Email is the best way to reach her at [her email] — she'd be happy to write back. You can also connect with her on LinkedIn at [her LinkedIn link].
+
+The spoken rendering — no URL, because a URL cannot be heard — is what
+`voice/speaks/answer.txt` holds now, and what the two voices will speak:
+
+> That's beyond what I have here, but it's exactly the kind of thing Nadia likes answering in her own words. Email is the best way to reach her at [her email] — she'd be happy to write back. You can also connect with her on LinkedIn — the link is on screen.
+
+The two contact details are elided above; they are in `data/profile.yaml`, and
+the exact texts are in `voice/speaks/answer-screen.txt` and
+`voice/speaks/answer.txt`. Both files were written by code from that one
+answer — `answer.for_speaking()` and `answer.refusal.screen()` — not by a
+second billed call. The screen rendering is in `answer-screen.txt`, which is
+where the fixed command line writes it from now on.
+
+The refused answer still cost $0.00080076: the system prompt inlines the
+stand-in's profile, 2250 characters of it, so every call pays for the prompt.
+The command line prints the cost but not the seconds the call took, so the
+seconds are not recorded for this call.
+
+### Finding — the question is half answerable, and the prompt refuses all of it
+
+The stand-in's profile answers half of the question. The Receipt reader's
+`breaks` field says: "A discount printed as a negative number; every model
+copied the sign and the total failed." That is the answer to "what broke in
+your receipt reader project".
+
+The other half the profile cannot answer: nothing in it mentions CPSC 415 or
+a skill from it. `skills_shipped` lists Python, Java, Git and GitHub pull
+requests, pytest and the OpenRouter APIs — skills with no course attached —
+and the stand-in is a Trinity College senior, so CPSC 415 is not even his
+course.
+
+The prompt's rule is whole-question: "If the profile does not cover the
+question, reply with exactly OUT_OF_SCOPE and nothing else." A question with
+one covered half and one uncovered half is not covered, so the model refuses
+the whole thing — including the half it could have answered, and including
+the `breaks` field, which is what a visitor would most want to hear.
+
+There is no rule for a partly covered question: answer the part the profile
+covers, say plainly that the rest is not in there, and refuse only that. That
+is a prompt decision for the real chatbot, and it is in `TODO.md`.
+
 ## Cost record
 
 ### Two stray chat calls — 2026-11-08

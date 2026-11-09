@@ -46,6 +46,10 @@ What did you learn about reading code or using concepts that were unfamiliar to 
   them. Checking, not asserting.
 - Windows PowerShell 5.1: `>>` writes UTF-16 (broke requirements.txt);
   Get-Content shows UTF-8 as "â€”" unless given -Encoding UTF8.
+- Windows: a request to http://localhost took about 2 s, the same request to
+  http://127.0.0.1 took 0 s (name resolution, not the server). Using
+  127.0.0.1 cut the voice test suite from 30 s to 6 s. The browser check
+  should say which name it used.
 
 ### Why this choice? (Week 7 decisions)
 - One-shot voice turn with the transcript shown (editing = later intent).

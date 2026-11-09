@@ -318,6 +318,30 @@ There is no rule for a partly covered question: answer the part the profile
 covers, say plainly that the rest is not in there, and refuse only that. That
 is a prompt decision for the real chatbot, and it is in `TODO.md`.
 
+## Speaks
+
+The two speech calls, run by hand on 2026-11-08, each spoke `voice/speaks/answer.txt` —
+the spoken rendering of the refusal, with the email kept and the LinkedIn URL
+replaced by "the link is on screen". Both exited 0.
+
+```
+speaks\answer-class.mp3  335520 bytes  269 chars  1.3s  cost $0.004035 (estimated)  [microsoft/mai-voice-2.1-flash / en-US-Harper:MAI-Voice-2.1-Flash]
+speaks\answer-eleven.mp3  281329 bytes  269 chars  3.3s  cost $0.010760 (estimated)  [elevenlabs/eleven-v4-turbo / george]
+```
+
+- ElevenLabs cost 2.7x the class voice ($0.010760 vs $0.004035), matching the
+  course's estimate, and took 2.5x as long (3.3s vs 1.3s).
+- Both costs are estimated from the catalog price per character: the speech
+  reply carries no usage object, so the real bill is in the generation record
+  (~1 min after the call) and replaces the estimate then.
+- The answer was the refusal, so the course number does not appear in it.
+  The voices could be judged only on the name, the email, and "the link is
+  on screen".
+
+## What I heard myself
+
+Class voice: the read aloud was great. It said Nadia well, read the email correctly with @ as 'at' and icloud too, and read 'the link is on screen'. ElevenLabs: everything sounded well pronounced and normal.
+
 ## Cost record
 
 ### Two stray chat calls — 2026-11-08

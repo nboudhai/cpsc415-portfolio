@@ -444,3 +444,44 @@ the sign.
 The refusal rule is whole-question, so a partly grounded
 embellishment is not caught today; this is a prompt question for the
 real chatbot.
+
+## Key check
+
+Before tagging on 2026-11-08, the key-shape search ran in both the
+working tree and the history and printed nothing:
+
+```
+git grep -nE "sk-or-v1-[0-9a-f]{16,}"                                            # exit 1, nothing printed
+git log -p | Select-String -Pattern "sk-or-v1-[0-9a-f]{16,}"                      # nothing printed
+```
+
+A plain `git grep -n "sk-or"` matches in 21 places. Each one is
+harmless — placeholder, documentation, the redaction pattern, a
+fake test key, or an absence check — and the shape search above does
+not match any of them.
+
+| File | Line | Why it is harmless |
+| --- | --- | --- |
+| `.claude/settings.local.json.example` | 5 | placeholder (`sk-or-v1-...` is the literal `…`, not a key; the real `settings.local.json` is gitignored) |
+| `ANNOTATION.md` | 44 | documentation (the rule that asks for the shape search) |
+| `plan.md` | 63 | documentation (CI mitigation text mentions `sk-or-…`) |
+| `plan.md` | 77 | documentation (the test design's `re.search(r'sk-or-', html)`) |
+| `plan.md` | 232 | documentation (the key-check step itself) |
+| `plan.md` | 233 | documentation (rationale: a plain `sk-or` search is no good) |
+| `plan.md` | 235 | documentation (the working-tree command) |
+| `plan.md` | 236 | documentation (the history command) |
+| `plan.md` | 237 | documentation (the "must be empty" rule) |
+| `plan.md` | 362 | documentation (this section's instruction) |
+| `voice/redact.py` | 11 | the redaction pattern (the regex the server uses to scrub the key) |
+| `voice/test_browser.py` | 67 | absence check: a test asserting the key prefix does NOT appear in the page |
+| `voice/tests/test_loop.py` | 173 | fake test key (`FAKEKEY` is not hex, so the shape search does not match) |
+| `voice/tests/test_loop.py` | 176 | fake test key (the faked provider's echo) |
+| `voice/tests/test_loop.py` | 181 | fake test key (assertion against the log) |
+| `voice/tests/test_speak.py` | 193 | fake test key |
+| `voice/tests/test_speak.py` | 196 | fake test key (the faked provider's echo) |
+| `voice/tests/test_speak.py` | 202 | fake test key (assertion against the log) |
+| `voice/tests/test_transcribe.py` | 191 | fake test key |
+| `voice/tests/test_transcribe.py` | 194 | fake test key (the faked provider's echo) |
+| `voice/tests/test_transcribe.py` | 198 | fake test key (assertion against the JSON dump) |
+
+No real key in the tree or the history.

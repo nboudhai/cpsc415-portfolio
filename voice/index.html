@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nadia &mdash; voice interface</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  p.lede { color: #666; margin-top: 0; }
+  section { margin: 1.25rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+  button, input[type="file"], textarea { font-size: 1rem; }
+  button { padding: 0.5rem 1rem; cursor: pointer; }
+  textarea { width: 100%; min-height: 4rem; box-sizing: border-box; padding: 0.5rem; }
+  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  #status { color: #888; font-size: 0.9rem; }
+  #transcript, #answer { background: #f8f8f8; padding: 0.75rem; border-radius: 4px; margin-top: 0.25rem; white-space: pre-wrap; }
+  #transcript { color: #555; font-style: italic; }
+  #error { background: #fee; color: #900; padding: 0.75rem; border-radius: 4px; }
+  #error[hidden] { display: none; }
+  audio { width: 100%; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+  <h1>Ask me about my work</h1>
+  <p class="lede">Record up to 30 seconds, upload a clip, or type a question.</p>
+
+  <section id="recorder">
+    <div class="row">
+      <button id="record-btn" type="button">Record</button>
+      <span id="status">ready</span>
+    </div>
+  </section>
+
+  <section id="upload">
+    <label for="file-input">Or upload an audio clip:</label>
+    <input type="file" id="file-input" accept="audio/*">
+  </section>
+
+  <section id="ask-typed">
+    <label for="question">Or type your question:</label>
+    <textarea id="question" placeholder="What have you shipped?"></textarea>
+    <div class="row" style="margin-top: 0.5rem;">
+      <button id="ask-btn" type="button">Ask</button>
+    </div>
+  </section>
+
+  <section id="result" hidden>
+    <h2>Transcript</h2>
+    <div id="transcript"></div>
+    <h2>Answer</h2>
+    <div id="answer"></div>
+    <audio id="audio" controls></audio>
+  </section>
+
+  <div id="error" hidden></div>
+
+  <script>
+    "use strict";
+
+    // The fetch calls go to a relative path, not a host: the browser
+    // resolves them against the origin that served the page. A relative
+    // path means the same file works in development and once deployed.
+    const MAX_RECORD_MS = 30000;
+    let mediaRecorder = null;
+    let chunks = [];
+
+    const recordBtn = document.getElementById("record-btn");
+    const status = document.getElementById("status");
+    const fileInput = document.getElementById("file-input");
+    const questionInput = document.getElementById("question");
+    const askBtn = document.getElementById("ask-btn");
+    const transcriptEl = document.getElementById("transcript");
+    const answerEl = document.getElementById("answer");
+    const audioEl = document.getElementById("audio");
+    const errorEl = document.getElementById("error");
+    const resultEl = document.getElementById("result");
+
+    function showError(message) {
+      resultEl.hidden = true;
+      audioEl.removeAttribute("src");
+      audioEl.hidden = true;
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    }
+
+    function showResult(data) {
+      errorEl.hidden = true;
+      transcriptEl.textContent = data.transcript || "";
+      answerEl.textContent = data.answer || "";
+      if (data.audio_b64) {
+        audioEl.src = "data:audio/mp3;base64," + data.audio_b64;
+        audioEl.hidden = false;
+      } else {
+        audioEl.removeAttribute("src");
+        audioEl.hidden = true;
+      }
+      resultEl.hidden = false;
+    }
+
+    async function sendAudio(blob, mimeType) {
+      status.textContent = "sending…";
+      try {
+        const response = await fetch("/api/voice", {
+          method: "POST",
+          headers: { "Content-Type": mimeType },
+          body: blob
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          showError(data.error || "HTTP " + response.status);
+        } else {
+          showResult(data);
+        }
+      } catch (err) {
+        showError(String(err));
+      } finally {
+        status.textContent = "ready";
+      }
+    }
+
+    async function sendQuestion(question) {
+      status.textContent = "asking…";
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+          body: question
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) {
+          showError(data.error || "HTTP " + response.status);
+        } else {
+          showResult(data);
+        }
+      } catch (err) {
+        showError(String(err));
+      } finally {
+        status.textContent = "ready";
+      }
+    }
+
+    recordBtn.addEventListener("click", async function () {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : (MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "");
+        if (!mimeType) {
+          showError("Your browser does not support audio recording.");
+          return;
+        }
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+        chunks = [];
+
+        mediaRecorder.ondataavailable = function (e) {
+          if (e.data && e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.onstop = async function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          const blob = new Blob(chunks, { type: mimeType });
+          chunks = [];
+          recordBtn.textContent = "Record";
+          await sendAudio(blob, mimeType);
+        };
+
+        mediaRecorder.start();
+        recordBtn.textContent = "Stop";
+        status.textContent = "recording…";
+
+        // 30-second page-side cap (behavior 15): the server would refuse
+        // anything over its own limit too, but the cap here saves a round
+        // trip when the visitor forgets to press Stop.
+        setTimeout(function () {
+          if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+          }
+        }, MAX_RECORD_MS);
+      } catch (err) {
+        showError("Microphone access was denied or unavailable.");
+      }
+    });
+
+    fileInput.addEventListener("change", async function (e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      await sendAudio(file, file.type || "audio/webm");
+    });
+
+    askBtn.addEventListener("click", async function () {
+      const q = questionInput.value.trim();
+      if (!q) return;
+      await sendQuestion(q);
+    });
+
+    questionInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        askBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>

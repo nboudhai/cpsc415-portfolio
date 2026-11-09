@@ -37,6 +37,10 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
 - My chatbot is not built yet. For Week 7, use
   ../ai-integration-course/examples/voice-loop/profile.json and that
   example's answer step as a stand-in, and say so in CHECKS.md.
+- My OPENROUTER_API_KEY is set in the shell that launched the agent, so every
+  command the agent runs can bill. Never start the server, call answer(),
+  transcribe(), or speak(), or probe a route by hand. Prove things only through
+  pytest with the faked clients. Billed calls are made by me, by hand.
 
 ## Common mistakes
 - 2026-11-08: Told to show CHECKS.md before saving, the agent saved first and
@@ -46,3 +50,6 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
   as "another real project in the profile"; Sam Rivera's profile.json has only
   the RAG project and the Receipt reader. Check every claim about the profile
   against the file.
+- 2026-11-08: During step 3, a timing probe hit POST /api/chat twice with my key
+  inherited from the session: two billed chat calls, after being told never to
+  run a billed call. Recorded in voice/CHECKS.md "Cost record".

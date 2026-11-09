@@ -53,3 +53,7 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
 - 2026-11-08: During step 3, a timing probe hit POST /api/chat twice with my key
   inherited from the session: two billed chat calls, after being told never to
   run a billed call. Recorded in voice/CHECKS.md "Cost record".
+- 2026-11-08: Step 4 reported 82 passed, but 5 tests failed on a machine with
+  no key: they passed only because my key was inherited from the shell. Every
+  voice test now gets a fake key from voice/tests/conftest.py. Before claiming
+  "no key needed", run the suite with the key removed.

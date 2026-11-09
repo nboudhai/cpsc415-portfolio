@@ -230,3 +230,20 @@ def test_the_server_serves_the_page_when_it_is_there(loop, monkeypatch, tmp_path
 def test_the_recording_limit_is_the_servers_own():
     """Behavior 15: the cap is ten megabytes, in the server's own constant."""
     assert server_module.MAX_BODY == 10_000_000
+
+
+def test_make_server_binds_127_0_0_1():
+    """The server binds to 127.0.0.1, not 'localhost'.
+
+    The Windows resolver waits two seconds for the name 'localhost' (CHECKS.md
+    "localhost vs 127.0.0.1", step 3), so every request would wait for it.
+    The bind is the kernel's view, not the print at startup, and this test
+    reads it directly. The socket is closed before the test returns so a
+    stray port can never outlive the suite.
+    """
+    httpd = server_module.make_server(0)
+    try:
+        host = httpd.server_address[0]
+        assert host == "127.0.0.1", f"make_server bound {host!r}, expected '127.0.0.1'"
+    finally:
+        httpd.server_close()

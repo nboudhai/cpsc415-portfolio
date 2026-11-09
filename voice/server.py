@@ -141,12 +141,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(port: int = 8000) -> ThreadingHTTPServer:
-    """The server on the port given: a slow turn must not block the next visitor."""
-    return ThreadingHTTPServer(("localhost", port), Handler)
+    """The server on the port given: a slow turn must not block the next visitor.
+
+    The bind address is 127.0.0.1, not 'localhost': on this machine the
+    resolver waits two seconds for that name, which would make every
+    request in a session wait for it.
+    """
+    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
 
 if __name__ == "__main__":
-    print(f"http://localhost:8000  (stt {STT_MODEL}, chat {CHAT_MODEL}, tts {TTS_MODEL}/{TTS_VOICE})")
+    print(f"http://127.0.0.1:8000  (stt {STT_MODEL}, chat {CHAT_MODEL}, tts {TTS_MODEL}/{TTS_VOICE})")
     try:
         make_server(8000).serve_forever()
     except KeyboardInterrupt:

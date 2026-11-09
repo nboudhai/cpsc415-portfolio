@@ -367,6 +367,31 @@ stand-in, the model replies OUT_OF_SCOPE and code writes the refusal
     is estimated from the catalog price per character and marked estimated.
 - **Dependencies:** `openrouter` (as above), `pytest`.
 
+### Browser check (`voice/test_browser.py`)
+
+- **What it does:** Drives the page from a real browser with Playwright. The
+  unbilled test uploads a file with an unmapped content-type and asserts the
+  page shows the server's 415 message in its error block. The billed test
+  uploads a recorded clip through the page's file picker, waits for the
+  spoken answer, and asserts the browser never saw the key or the provider
+  (no `Authorization` header, no `openrouter` URL in the network log). The
+  billed test runs only when both `OPENROUTER_API_KEY` and `VOICE_EVAL=1` are
+  set; it is skipped, not failed, otherwise, so a normal test run never
+  bills.
+- **Language:** Python, Playwright's sync API, pytest. **Why:** Playwright is
+  the only realistic way to script a browser that opens a real microphone,
+  uploads a real file through a real page, and reports what the network tab
+  saw. The example it was adapted from is in `ai-integration-course`; the
+  selectors and assertions are updated for the new page.
+- **Model:** N/A — Playwright drives the browser; the three billed steps are
+  the same steps the loop already calls.
+- **Interfaces:**
+  - `voice/test_browser.py` — two tests. URL from `VOICE_URL`, default
+    `http://127.0.0.1:8000`. The fixture clip is `voice/clips/own-01.m4a`.
+- **Dependencies:** `playwright` (the browser check, lab step 6) and
+  `pytest`. `playwright install chromium` is a one-time download; the
+  repository never carries the browser binary.
+
 ### Week 7 behaviors
 
 Numbered like the behaviors above; these are what the test stage checks.
@@ -501,3 +526,5 @@ Added by this spec:
 **Amended:** *2026-11-08 — Week 7 behavior 17: a rejected recording ends the turn with a plain 502 and no provider message in the browser.*
 
 **Amended:** *2026-11-08 — Week 7 behavior 18: the answer's files are prepared before the billed call, `--out` holds the spoken text, the screen text goes next to it as `answer-screen.txt`, and the command line exits 2 when it cannot start.*
+
+**Amended:** *2026-11-08 — Week 7 browser check section added; playwright listed under its Dependencies with the reason "the browser check, lab step 6".*

@@ -4,8 +4,10 @@ The transcription call is faked: the stub records the clip it was handed and
 returns the text that clip was supposed to contain. So the assertions are about
 this code's behaviour and not about a provider's answer.
 
-No key, no network, nothing billed: the run reads the key from the environment
-before it starts, and every transcription goes through the stub.
+No network, nothing billed: every transcription goes through the stub, and the
+key the command line asks for is a fake one that conftest.py sets, so these
+tests run the same on a machine where no key is set. The one test that wants
+no key removes it again.
 """
 import json
 

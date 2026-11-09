@@ -147,6 +147,18 @@ written. Still no configuration file is inherited.
 `ruff check voice/` passes clean. The 14 findings that predate the lab are
 unchanged and are still listed above.
 
+## The test suite
+
+`pytest voice/tests -q` runs 52 tests with no key set and nothing billed. The
+command lines ask for the key before they do anything, so the tests give them
+a fake one — `test-not-a-real-key`, set for every test in `voice/tests/conftest.py` —
+and the one test that wants no key removes it again with `monkeypatch.delenv`.
+
+No test reads the shell's key, so the suite passes the same on a machine that
+has one and on a machine that has none. Verified on 2026-11-08 with the key
+removed from the command itself: `pytest voice/tests -q` → 52 passed, and
+`pytest -q` → 82 passed.
+
 ## The set run
 
 `voice/transcribe.py --set clips/expected.json` is the run that transcribes a

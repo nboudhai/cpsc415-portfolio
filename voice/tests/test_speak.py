@@ -2,7 +2,11 @@
 
 The speech call is faked: the client is a stub that hands back raw bytes and
 the headers the SDK returns, so the assertions are about this code's behaviour
-and not about a provider's audio. No key, no network, nothing billed.
+and not about a provider's audio.
+
+No network, nothing billed: the key the command line asks for is a fake one
+that conftest.py sets, so these tests run the same on a machine where no key
+is set. The one test that wants no key removes it again.
 """
 import wave
 from types import SimpleNamespace

@@ -413,8 +413,9 @@ Numbered like the behaviors above; these are what the test stage checks.
     skipped, not failed, otherwise. An ordinary test run never bills.
 13. **One transcription per clip, one speech call per answer.** No model call
     inside a loop of tests. A set run processes every clip even after one
-    fails, then exits 1 if any clip failed and 0 otherwise, so a failure never
-    causes a clip to be transcribed twice.
+    fails, then exits 1 if any clip failed and 0 when none did, so a failure
+    never causes a clip to be transcribed twice. It exits 2 when the run
+    cannot start because no key is set; nothing is billed.
 14. **The key stays on the server.** The browser sends only audio; the key is
     read from the environment when running locally and from the host's secret
     store once deployed, and reaches neither the page nor the network tab.
@@ -484,5 +485,7 @@ Added by this spec:
 **Amended:** *2026-11-08 — Week 7 behavior 12: the billed tests also require VOICE_EVAL=1.*
 
 **Amended:** *2026-11-08 — Week 7 behavior 13: a set run never stops early and exits 1 if any clip failed.*
+
+**Amended:** *2026-11-08 — Week 7 behavior 13: the set run also exits 2 when it cannot start because no key is set; nothing is billed.*
 
 **Amended:** *2026-11-08 — Week 7 behavior 17: a rejected recording ends the turn with a plain 502 and no provider message in the browser.*

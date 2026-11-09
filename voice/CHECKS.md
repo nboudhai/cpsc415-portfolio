@@ -131,6 +131,46 @@ the refusal test now asserts the 200.
 `ruff check voice/` passes clean. The 14 findings that predate the lab are
 unchanged and are still listed above.
 
+### Ruff run — 2026-11-08 (step 4: the transcriber and the speaker)
+
+`python -m ruff check voice/`, ruff 0.17.4 from `.venv`, run after step 4 was
+written. Still no configuration file is inherited.
+
+**3 findings in the new code, all fixed.**
+
+| File | Line | Rule | Fix |
+| --- | --- | --- | --- |
+| `voice/server.py` | 15 | F401 | `import os` removed; the redaction moved to `voice/redact.py` |
+| `voice/speak.py` | 15 | I001 | import block sorted |
+| `voice/transcribe.py` | 11 | I001 | import block sorted |
+
+`ruff check voice/` passes clean. The 14 findings that predate the lab are
+unchanged and are still listed above.
+
+## The set run
+
+`voice/transcribe.py --set clips/expected.json` is the run that transcribes a
+whole set, once each, and checks every clip in code. Its exit codes:
+
+| Code | Meaning |
+| --- | --- |
+| 0 | every clip passed the check |
+| 1 | at least one clip failed: a mishearing, or a clip the provider refused |
+| 2 | the run could not start: there is no key, so nothing was billed |
+
+Exit 1 is not a crash. The run transcribes every clip even after one fails,
+writes the records to `--out`, says which clip failed and why, and exits 1. A
+clip the provider refused is recorded with its cost as "none reported", because
+the provider reports no usage for a call it refused.
+
+The first eval command, run by hand because it bills:
+
+```
+python transcribe.py --set clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-own.json
+```
+
+It is the only transcription of Nadia's clips on that model.
+
 ## Cost record
 
 ### Two stray chat calls — 2026-11-08

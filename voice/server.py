@@ -12,7 +12,6 @@ fake the three steps.
 """
 import base64
 import json
-import os
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +19,7 @@ from pathlib import Path
 
 from answer import DEFAULT_MODEL as CHAT_MODEL
 from answer import answer, for_speaking
+from redact import redact
 from speak import DEFAULT_MODEL as TTS_MODEL
 from speak import DEFAULT_VOICE as TTS_VOICE
 from speak import speak
@@ -40,12 +40,6 @@ EMPTY_ANSWER = "I didn't catch that."
 
 class RecordingRejected(Exception):
     """The provider would not take the recording. The turn ends here."""
-
-
-def redact(text: str) -> str:
-    """The key never reaches the log, even if the provider hands it back."""
-    key = os.environ.get("OPENROUTER_API_KEY")
-    return text.replace(key, "[redacted]") if key else text
 
 
 def log_provider_message(error: Exception) -> None:

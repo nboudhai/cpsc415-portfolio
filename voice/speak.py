@@ -1,24 +1,34 @@
 """Text in, audio out, through OpenRouter's speech endpoint.
 
+    python speak.py "Hello from CPSC 415." --out hello.mp3
+    python speak.py --in speaks/answer.txt --out speaks/answer.wav
+
 The reply is raw audio, not JSON: an error body comes back as JSON, so the
 content type is checked before anything is written — an error body never lands
 in a .mp3.
 
 The provider call lives here. The command line around it comes with the set run.
+
+Exit codes: 0 when the audio was written, 2 when the run could not start or
+the provider would not speak the text.
 """
+import argparse
 import json
 import os
 import re
+import sys
 import time
 import urllib.request
 import wave
 from pathlib import Path
 
 from openrouter import OpenRouter
+from redact import redact
 
 DEFAULT_MODEL = "microsoft/mai-voice-2.1-flash"        # priced per character
 DEFAULT_VOICE = "en-US-Harper:MAI-Voice-2.1-Flash"     # the voice ids carry the locale
 CATALOG = "https://openrouter.ai/api/v1/models?output_modalities=speech"
+NO_KEY = "OPENROUTER_API_KEY is not set; nothing was billed."
 _PRICES: dict[str, float] = {}
 
 
@@ -27,7 +37,7 @@ def _client() -> OpenRouter:
     tests import this module and fake the call."""
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
+        raise RuntimeError(NO_KEY)
     return OpenRouter(api_key=key)
 
 
@@ -62,9 +72,11 @@ def speak(text: str, out: Path, model: str = DEFAULT_MODEL, voice: str = DEFAULT
         out.write_bytes(data)
     generation_id = reply.headers.get("x-generation-id")
     billed = cost_of(client, generation_id)
+    estimated = billed is None
     return {"file": str(out), "model": model, "voice": voice, "chars": len(text),
             "bytes": len(data), "seconds": seconds, "generation_id": generation_id,
-            "cost": billed if billed is not None else estimate(model, len(text))}
+            "cost": billed if not estimated else estimate(model, len(text)),
+            "cost_is_estimate": estimated}
 
 
 def cost_of(client, generation_id: str | None) -> float | None:
@@ -88,3 +100,38 @@ def estimate(model: str, chars: int) -> float | None:
         except Exception:  # noqa: BLE001  # the catalog is a nicety; the call itself worked
             return None
     return round(_PRICES[model] * chars, 6) if model in _PRICES else None
+
+
+def main(argv: list[str] | None = None) -> int:
+    """The command line: the text to speak, and where to write the audio."""
+    parser = argparse.ArgumentParser(description="Speak some text to an audio file.")
+    parser.add_argument("text", nargs="?", help="the text to speak")
+    parser.add_argument("--in", dest="source", type=Path,
+                        help="read the text from this file")
+    parser.add_argument("--out", type=Path, default=Path("speech.mp3"))
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--voice", default=DEFAULT_VOICE)
+    args = parser.parse_args(argv)
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        print(NO_KEY, file=sys.stderr)
+        return 2
+    text = args.text
+    if args.source:
+        text = args.source.read_text(encoding="utf-8")
+    if not text:
+        parser.error("give the text to speak, or --in file")
+    try:
+        info = speak(text, args.out, args.model, args.voice)
+    except Exception as error:  # noqa: BLE001  # the provider's message never carries the key
+        print(redact(str(error)), file=sys.stderr)
+        return 2
+    cost = info["cost"]
+    shown = f"${cost:.6f}" if isinstance(cost, (int, float)) else "cost not reported"
+    mark = " (estimated)" if info["cost_is_estimate"] else ""
+    print(f"{info['file']}  {info['bytes']} bytes  {info['chars']} chars  {info['seconds']}s  "
+          f"cost {shown}{mark}  [{info['model']} / {info['voice']}]")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

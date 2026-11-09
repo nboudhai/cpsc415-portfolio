@@ -370,3 +370,77 @@ therefore talks to `127.0.0.1`, which took the suite from 30 seconds to 6.
 The lesson for the browser check in step 8: a page loaded from `localhost` may
 pay the same two seconds, so the timings recorded there should say which name
 was used.
+
+## Browser check
+
+On 2026-11-08 I ran `pytest voice/test_browser.py` against the server
+on http://127.0.0.1:8000, with `OPENROUTER_API_KEY` and `VOICE_EVAL=1`
+set in the shell.
+
+**First billed run failed.** The provider refused with `maximum cost
+exceeds your available credits`. The server logged the provider's
+message and returned 502 — behavior 17 observed live, the provider's
+message appearing only in the server window. The test waited its
+full 120 s because it watches only `#transcript`: a 502 leaves the
+transcript empty, so the test never sees the error and times out
+instead.
+
+**After $10 of credit:** 2 passed in 12.55s; the server logged
+`POST /api/voice 200` at 23:10:35.
+
+The last three assertions of `test_a_recording_through_the_page_never_exposes_the_key_or_the_provider`,
+which is the point of the check:
+
+```python
+assert all(auth is None for _, auth in requests), "an Authorization header left the browser"
+assert all("openrouter" not in url for url, _ in requests), "the browser called the provider"
+assert any(url.endswith("/api/voice") for url, _ in requests), "the browser did not call our server"
+```
+
+The first fails if the browser sent an `Authorization` header to any
+URL — including its own origin, which it must not. The second fails
+if the browser talked to the provider directly instead of through
+the server. The third fails if it never reached our server at all.
+All three pass on the live run.
+
+## One turn
+
+One visitor turn, by microphone in Firefox at http://127.0.0.1:8000,
+recorded by hand on 2026-11-08.
+
+| | |
+| --- | --- |
+| Question | What broke in your receipt reader project? |
+| Transcript | "What broke in your receipt reader project?" |
+| Answer | "A discount printed as a negative number broke it: every vision model copied the minus sign straight into the total, so the arithmetic check failed even though the OCR looked right. It taught me to treat edge cases like a negative discount as a specification question rather than a model bug, since the parser was faithfully reading what was on the receipt." |
+
+| Step | Cost | Share |
+| --- | --- | --- |
+| Transcription | $0.00000976 | 0.2% |
+| Chat | $0.0005127 | 9.7% |
+| Speech | $0.00474 | 90.1% |
+| **Total** | **$0.00526246** | **100%** |
+
+Speech is about 90% of a turn. This total is the per-visitor cost
+for the hosting decision in TODO.md (a site-only key with a credit
+limit, route caps).
+
+### Finding — the answer is grounded but embellished
+
+The stand-in profile's receipt reader `breaks` field says only:
+"A discount printed as a negative number; every model copied the sign
+and the total failed." The `learned` field says: "Edge cases are
+specification questions, not model bugs."
+
+The answer paraphrases the `breaks` field (the minus sign, the
+arithmetic failing) and quotes the `learned` field (specification
+question, not a model bug). Two phrases are not in the profile:
+"even though the OCR looked right" and "the parser was faithfully
+reading what was on the receipt". Neither field in profile.json
+mentions OCR looking right or the parser being faithful — they are
+the model's additions to a profile that only said every model copied
+the sign.
+
+The refusal rule is whole-question, so a partly grounded
+embellishment is not caught today; this is a prompt question for the
+real chatbot.

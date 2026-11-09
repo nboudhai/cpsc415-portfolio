@@ -48,3 +48,9 @@
 
 &#x20;     plainly that the rest is not in there, and refuse only that.
 
+\- \[ ] voice/test_browser.py: the billed test polls `#transcript` only,
+&#x20;     so a refused recording (or any failure) sits there for 120 s
+&#x20;     before the timeout fires. Also watch `#error` and fail fast
+&#x20;     when it becomes visible — a 502 should cost seconds, not
+&#x20;     minutes.
+

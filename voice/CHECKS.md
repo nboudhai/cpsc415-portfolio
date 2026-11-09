@@ -64,3 +64,41 @@ The portfolio chatbot is not built yet. The Week 7 lab uses
 `../ai-integration-course/examples/voice-loop/profile.json` and that example's
 answer step as a stand-in, to be swapped for the real chatbot before
 November 30.
+
+## Linter
+
+### Ruff run — 2026-11-08
+
+`python -m ruff check .`, ruff 0.17.4 from `.venv`, run from the repository
+root on 2026-11-08 after the step 2 checker was written.
+
+**No configuration file is inherited.** There is no `ruff.toml`, `.ruff.toml`
+or `pyproject.toml` in the repository or in any ancestor directory up to the
+drive root, and no `RUFF_*` environment variable is set. `ruff check .
+--isolated`, which ignores every configuration file, reports the identical 14
+findings, so the rules that fired are ruff 0.17.4's own defaults, not a
+configuration file's.
+
+**One finding in the new code, fixed.** `voice/tests/test_check.py:14` —
+I001, import block un-sorted or un-formatted. Fixed with `ruff check
+voice/tests/test_check.py --fix`; `ruff check voice/` passes clean.
+
+**14 findings that predate this lab, left alone.** They are in files Week 7
+did not touch, so they are recorded here rather than changed:
+
+| File | Line | Rule |
+| --- | --- | --- |
+| `.claude/hooks/guard.py` | 28 | PIE810 |
+| `profile_schema.py` | 18 | I001 |
+| `profile_schema.py` | 93 | UP037 |
+| `profile_schema.py` | 228 | UP037 |
+| `profile_schema.py` | 236 | UP037 |
+| `profile_schema.py` | 244 | UP037 |
+| `scripts/validate_profile.py` | 40 | UP035 |
+| `scripts/validate_profile.py` | 48 | I001 |
+| `scripts/validate_profile.py` | 48 | RUF100 |
+| `scripts/validate_profile.py` | 49 | RUF100 |
+| `scripts/validate_profile.py` | 51 | RUF100 |
+| `scripts/validate_profile.py` | 106 | ISC004 |
+| `tests/test_validate_profile.py` | 31 | I001 |
+| `tests/test_validate_profile.py` | 31 | RUF100 |

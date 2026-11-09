@@ -140,9 +140,13 @@ unless a command says otherwise.
 3. **The refusal and the loop, tests first.** The same order for
    `voice/tests/test_refusal.py` and `voice/tests/test_loop.py` against
    `voice/refusal.py`, `voice/answer.py`, and `voice/server.py`, with the model
-   call faked. *Proof:* green, no key, no billed call.
-4. **The transcriber and the speaker.** Write `voice/transcribe.py` and
-   `voice/speak.py`, and write `voice/tests/test_transcribe.py` first: with the
+   call faked. *Proof:* green, no key, no billed call. The server imports the
+   transcriber and the speaker, so the provider calls in `voice/transcribe.py`
+   and `voice/speak.py` were written in this step as well; step 4 adds their
+   command lines, the set run, the exit code, and `voice/tests/test_transcribe.py`.
+4. **The transcriber and the speaker.** Complete `voice/transcribe.py` and
+   `voice/speak.py` with their command lines — the provider calls are already
+   written, from step 3 — and write `voice/tests/test_transcribe.py` first: with the
    transcription call faked, it asserts that every clip in the set is processed
    even after one fails, that a clip whose transcription raises — as a
    provider rejection does — is recorded as a failed clip and the set carries

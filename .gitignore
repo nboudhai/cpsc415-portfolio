@@ -22,3 +22,6 @@ venv/
 .gradle/
 bin/
 obj/
+
+# the server's transient output of the last spoken answer
+voice/last-answer.mp3

@@ -102,3 +102,60 @@ did not touch, so they are recorded here rather than changed:
 | `scripts/validate_profile.py` | 106 | ISC004 |
 | `tests/test_validate_profile.py` | 31 | I001 |
 | `tests/test_validate_profile.py` | 31 | RUF100 |
+
+### Ruff run — 2026-11-08 (step 3: the refusal and the loop)
+
+`python -m ruff check voice/`, ruff 0.17.4 from `.venv`, run after step 3 was
+written. Still no configuration file is inherited.
+
+**8 findings in the new code, all fixed.** They were all in step 3's files:
+
+| File | Line | Rule | Fix |
+| --- | --- | --- | --- |
+| `voice/tests/test_loop.py` | 10 | I001 | import block sorted |
+| `voice/tests/test_loop.py` | 130 | RUF059 | `body` unused → `_body` |
+| `voice/tests/test_loop.py` | 137 | RUF059 | `body` unused → `_body` |
+| `voice/tests/test_loop.py` | 163 | RUF059 | `status` unused → the test now asserts `status == 502` |
+| `voice/tests/test_loop.py` | 187 | RUF059 | `status` unused → the test now asserts `status == 200` |
+| `voice/tests/test_loop.py` | 189 | RUF015 | `[…][0]` → `next(…)` |
+| `voice/tests/test_loop.py` | 198 | RUF012 | `headers` annotated `ClassVar[dict]` |
+| `voice/tests/test_refusal.py` | 10 | F401 | `import pytest` removed; the file does not use it |
+
+The line numbers are as the run reported them; sorting the import block of
+`test_loop.py` moved everything below it down by two lines.
+
+Two of the four RUF059 findings were fixed by making the test say more rather
+than by hiding the name: the rejected-recording test now asserts the 502, and
+the refusal test now asserts the 200.
+
+`ruff check voice/` passes clean. The 14 findings that predate the lab are
+unchanged and are still listed above.
+
+## Cost record
+
+### Two stray chat calls — 2026-11-08
+
+While timing the test suite I ran a probe against `POST /api/chat` on the
+running server. The probe inherited `OPENROUTER_API_KEY` from the shell, so it
+made two real chat calls on `minimax/minimax-m3` with the question "hi" — one
+probe, then a second to compare the timings. **They are not part of the lab's
+eval**: they are not in the ten clip lines, and they are not evidence of
+anything. They are recorded here so the cost record is not quietly short two
+calls.
+
+`minimax/minimax-m3` is priced at $0.0000003 per prompt token and $0.0000012
+per completion token, so the two calls together cost a fraction of a cent. The
+exact figure is in the OpenRouter activity page; OpenRouter has no endpoint that
+lists a generation without already knowing its id, so it could not be read back
+here.
+
+### Finding — "localhost" costs two seconds a request on this machine
+
+Measured while timing the step 3 suite: every request to `http://localhost:…`
+took 2.03 s, and the same request to `http://127.0.0.1:…` took 0.00 s. The
+Windows resolver is the difference, not the server. The step 3 test fixture
+therefore talks to `127.0.0.1`, which took the suite from 30 seconds to 6.
+
+The lesson for the browser check in step 8: a page loaded from `localhost` may
+pay the same two seconds, so the timings recorded there should say which name
+was used.

@@ -175,13 +175,68 @@ writes the records to `--out`, says which clip failed and why, and exits 1. A
 clip the provider refused is recorded with its cost as "none reported", because
 the provider reports no usage for a call it refused.
 
-The first eval command, run by hand because it bills:
+The first of the four eval commands, run by hand because it bills:
 
 ```
 python transcribe.py --set clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-own.json
 ```
 
-It is the only transcription of Nadia's clips on that model.
+It is the only transcription of Nadia's clips on that model. The other three runs are in § Clips below.
+
+## Clips
+
+The four eval commands, run by hand on 2026-11-08 from `voice/`. Each one transcribes its clips once and checks every clip in code:
+
+```
+python transcribe.py --set ../../ai-integration-course/examples/voice-loop/clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-fixtures.json
+python transcribe.py --set ../../ai-integration-course/examples/voice-loop/clips/expected.json --model elevenlabs/scribe-v2 --out clips/transcripts-scribe-fixtures.json
+python transcribe.py --set clips/expected.json --model openai/whisper-large-v3-turbo --out clips/transcripts-whisper-own.json
+python transcribe.py --set clips/expected.json --model elevenlabs/scribe-v2 --out clips/transcripts-scribe-own.json
+```
+
+| Run | Model | Exit | Records |
+| --- | --- | --- | --- |
+| fixtures | openai/whisper-large-v3-turbo | 0 | `clips/transcripts-whisper-fixtures.json` |
+| fixtures | elevenlabs/scribe-v2 | 0 | `clips/transcripts-scribe-fixtures.json` |
+| own | openai/whisper-large-v3-turbo | 1 | `clips/transcripts-whisper-own.json` |
+| own | elevenlabs/scribe-v2 | 1 | `clips/transcripts-scribe-own.json` |
+
+The two own-clip runs exit 1 because own-02 failed the check on both models; the three fixture clips passed on both. The fixture runs used the course's `expected.json`, whose clip-02 carries the raised tolerance of 0.2 — the run that scored 0.1875 could not have passed without it. The own-clip runs used `voice/clips/expected.json`, the texts Nadia wrote before any model heard the clips.
+
+### One line per clip per model
+
+Whisper is `openai/whisper-large-v3-turbo`, Scribe is `elevenlabs/scribe-v2`. Rates are shown to four places; the JSON files hold them at full precision.
+
+| File | Model | WER | Missing | Audio s | Cost | Call s | Transcript |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| own-01.m4a | Whisper | 0.1176 | — | 10.000 | $0.000111 | 1.5 | "What broke in your receipt reader project and which scales from CPSCA 415 have you actually shipped?" |
+| own-01.m4a | Scribe | 0.0 | — | 7.211 | $0.000441 | 1.5 | "What broke in your receipt reader project and which skills from CPSC 415 have you actually shipped?" |
+| own-02.m4a | Whisper | 0.1333 | `Boudhaim`, `Maguire` | 6.484 | $0.000022 | 3.0 | "My name is Nadia Botheim-McGuire. What salary would you expect for your first job?" |
+| own-02.m4a | Scribe | 0.1333 | `Boudhaim`, `Maguire` | 6.485 | $0.000396 | 1.1 | "My name is Nadia Boatime McGuire. What salary would you expect for your first job?" |
+| clip-01.wav | Whisper | 0.0 | — | 6.380 | $0.000021 | 3.0 | "What programming languages have you shipped code in, and which one would you choose for a new web service?" |
+| clip-01.wav | Scribe | 0.0 | — | 6.380 | $0.000390 | 1.4 | "What programming languages have you shipped code in, and which one would you choose for a new web service?" |
+| clip-02.wav | Whisper | 0.1875 | — | 8.061 | $0.000027 | 1.2 | "Have you ever deployed anything with Kubernetes? Be honest, I'm comparing you with a boot camp graduate. Music" |
+| clip-02.wav | Scribe | 0.125 | — | 8.062 | $0.000493 | 1.2 | "Have you ever deployed anything with Kubernetes? Be honest, I'm comparing you with a boot camp graduate" |
+| clip-03.wav | Whisper | 0.0 | — | 7.708 | $0.000026 | 1.3 | "Tell me about the RAG project from CPSC 415. How many chunks did the index have and what did a query cost?" |
+| clip-03.wav | Scribe | 0.0 | — | 7.708 | $0.000471 | 1.1 | "Tell me about the RAG project from CPSC 415. How many chunks did the index have, and what did a query cost?" |
+
+The missing list is empty for the fixture clips even where a word was split: `must_contain` compares with the spacing folded away, so "boot camp" still satisfies "bootcamp", while the rate still counts the split as an edit.
+
+### Findings
+
+1. **Neither model got the name right.** Whisper wrote "Botheim-McGuire"; Scribe wrote "Boatime McGuire"; the text says "Boudhaim Maguire". Both scored the same rate, 0.1333, inside the 0.15 default, so the word-error rate passed own-02 and only the `must_contain` check failed it, on `Boudhaim` and `Maguire`. The sentence still sounded right and the rate said 0.133 — only looking for the name caught it.
+
+2. **Scribe was exact on own-01; Whisper was not.** Scribe read own-01 perfectly (0.0). Whisper heard "scales" for "skills" and "CPSCA" for "CPSC" — two substitutions in 17 words, 0.1176 — inside the 0.15 tolerance, so own-01 passed on both models.
+
+3. **Unexplained: Whisper's own-01 timing and price.** Whisper reported own-01 as 10.0 s of audio and charged $0.000111; Scribe measured the same file at 7.211 s. The file sizes predict Scribe's figure — own-01.m4a is 185,492 bytes and own-02.m4a is 167,043, and 185,492 / 167,043 × 6.485 s is about 7.20 s. Whisper's price per second on own-01 is $0.0000111, against $0.0000033 on the other four clips, 3.3 times as much; at its own rate that charge is about 33 s of audio against a file that is 7.2 s long by every other measure. Nothing in the records explains it, so it is recorded rather than explained away.
+
+4. **clip-02 reproduced the course's 0.188.** Whisper scored 0.1875 on clip-02 — the same mishearing the course recorded on Oct 26: "bootcamp" split into "boot camp" plus a stray "Music" on the trailing silence, three edits in 16 words. The course's `expected.json` raised that clip's tolerance to 0.2 for exactly this. Scribe split "bootcamp" too this time ("a boot camp graduate"), two edits, 0.125, where the Oct 26 run read it exactly. The fixture is not a fixed reference: both models misread it, and the course's file is the record of that.
+
+5. **Totals.** Whisper $0.000207, Scribe $0.002191, all ten $0.002398. These are the sums of the per-clip costs as displayed above; the raw values in the four JSON files sum to $0.000206459, $0.002190585 and $0.002397044. The two differ only by rounding in the sixth decimal.
+
+## What I heard myself
+
+I could argue for why they spelt Boudhaim as they did, though if I really had to pick one I'd say Boatime. Personally I don't hear 'Mc' in how I say Maguire; it would be very soft if it's there. But McGuire is a common name, so it is very close compared to the Boudhaim versions.
 
 ## Cost record
 

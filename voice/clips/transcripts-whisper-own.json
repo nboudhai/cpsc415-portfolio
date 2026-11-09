@@ -1,0 +1,37 @@
+[
+  {
+    "file": "own-01.m4a",
+    "model": "openai/whisper-large-v3-turbo",
+    "text": " What broke in your receipt reader project and which scales from CPSCA 415 have you actually shipped?",
+    "audio_seconds": 10.0,
+    "cost": 0.000111111111111,
+    "seconds": 1.5,
+    "ok": true,
+    "check": {
+      "ok": true,
+      "wer": 0.11764705882352941,
+      "missing": [],
+      "empty": false
+    },
+    "error": null
+  },
+  {
+    "file": "own-02.m4a",
+    "model": "openai/whisper-large-v3-turbo",
+    "text": " My name is Nadia Botheim-McGuire. What salary would you expect for your first job?",
+    "audio_seconds": 6.484,
+    "cost": 2.159172e-05,
+    "seconds": 3.0,
+    "ok": false,
+    "check": {
+      "ok": false,
+      "wer": 0.13333333333333333,
+      "missing": [
+        "Boudhaim",
+        "Maguire"
+      ],
+      "empty": false
+    },
+    "error": null
+  }
+]

@@ -69,3 +69,7 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
   no key: they passed only because my key was inherited from the shell. Every
   voice test now gets a fake key from voice/tests/conftest.py. Before claiming
   "no key needed", run the suite with the key removed.
+- 2026-11-15: Told "show me the draft before you save," the agent wrote
+  intent/tools.md first, then deleted it and admitted it; a second write was
+  blocked by Claude Code's auto-mode classifier. The rule above was already in
+  this file and in the prompt. Check git status after any "show me first" step.

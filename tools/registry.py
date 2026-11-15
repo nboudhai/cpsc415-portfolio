@@ -4,10 +4,14 @@ The repository list is one constant in code, and the schema's description is bui
 from that constant so the list is never written twice. Argument validation is the
 plain-code `validate()` pattern from the course's `tools.py`.
 
-The handlers themselves will live in `github_tool.py` and `intro_tool.py` (step 3);
-until then this module carries the local stubs so the loop has something to call.
+The handlers themselves live in `github_tool.py` and `intro_tool.py`; this module
+exposes the schemas, validation, and the `run_tool()` decision that the loop
+calls for every request.
 """
 import json
+
+from github_tool import recent_commits
+from intro_tool import request_intro
 
 
 # ---- the constants ----------------------------------------------------------------------------
@@ -72,19 +76,9 @@ TOOLS = [RECENT_COMMITS_SCHEMA, REQUEST_INTRO_SCHEMA]
 
 
 # ---- the handlers: name -> function -----------------------------------------------------------
-# step 3 moves these to github_tool.py and intro_tool.py; this module keeps the
-# names available so the loop can resolve them.
-def _recent_commits_stub(*args, **kwargs):
-    raise NotImplementedError("recent_commits handler lives in github_tool.py (step 3)")
-
-
-def _request_intro_stub(*args, **kwargs):
-    raise NotImplementedError("request_intro handler lives in intro_tool.py (step 3)")
-
-
 HANDLERS = {
-    "recent_commits": _recent_commits_stub,
-    "request_intro": _request_intro_stub,
+    "recent_commits": recent_commits,
+    "request_intro": request_intro,
 }
 
 

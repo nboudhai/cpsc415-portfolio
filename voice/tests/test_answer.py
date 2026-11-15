@@ -1,16 +1,14 @@
 """The answer command line's tests: the two files it writes, and what it writes
 them before the call.
 
-The chat call is faked: the stub answers with a text and records what it was
-asked. So the assertions are about this code's behaviour and not about a
+The tool loop is faked: the stub returns a reply and a trace and records what it
+was asked. So the assertions are about this code's behaviour and not about a
 model's answer.
 
 No network, nothing billed: the key the command line asks for is a fake one
 that conftest.py sets, so these tests run the same on a machine where no key
 is set. The one test that wants no key removes it again.
 """
-from types import SimpleNamespace
-
 import answer as answer_module
 import refusal
 import tools.loop as tools_loop_module
@@ -19,8 +17,8 @@ QUESTION = ("What broke in your receipt reader project, and which skills "
             "from CPSC 415 have you actually shipped?")
 
 
-class FakeClient:
-    """The chat call, faked.
+class FakeRun:
+    """The tools.loop.run call, faked.
 
     It records what it was asked, and it can look at the disk while it is
     answering: the answer must not be paid for and then lost.
@@ -31,32 +29,23 @@ class FakeClient:
         self.cost = cost
         self.on_call = on_call
         self.calls = []
-        self.chat = SimpleNamespace(send=self._send)
 
-    def _send(self, **kwargs):
-        self.calls.append(kwargs)
+    def __call__(self, messages, *, tools=None, model=None, max_steps=None, client=None,
+                 allow_side_effects=False):
+        self.calls.append({"messages": messages, "tools": tools, "model": model,
+                           "max_steps": max_steps})
         if self.on_call:
             self.on_call()
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))],
-            usage=SimpleNamespace(cost=self.cost))
+        return (self.reply, self.cost, {"steps": [], "calls": [], "pending": [],
+                                         "stopped_by": "answer",
+                                         "verdict": {"supported": True, "unsupported": []}})
 
 
-def fake_client(monkeypatch, **kwargs):
-    """Put the fake client where the command line will build the real one."""
-    client = FakeClient(**kwargs)
-    monkeypatch.setattr(answer_module, "_client", lambda: client)
-    return client
-
-
-def _no_client(*args, **kwargs):
-    """A stand-in for _client that blocks any real provider call in tests.
-
-    Used by the two tests that exercise answer()'s tools.loop.run code path
-    while the chat-based path is still in place: with _client blocked, a
-    stray chat() call raises and no network call is made.
-    """
-    raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
+def fake_run(monkeypatch, **kwargs):
+    """Put the fake run where answer() will call the real one."""
+    run = FakeRun(**kwargs)
+    monkeypatch.setattr(tools_loop_module, "run", run)
+    return run
 
 
 def test_the_out_file_holds_the_spoken_text_and_the_screen_file_the_screen_text(monkeypatch, tmp_path):
@@ -66,7 +55,7 @@ def test_the_out_file_holds_the_spoken_text_and_the_screen_file_the_screen_text(
     from it; the screen rendering, with the email and the LinkedIn link, is
     written next to it as answer-screen.txt.
     """
-    fake_client(monkeypatch)
+    fake_run(monkeypatch)
     out = tmp_path / "speaks" / "answer.txt"
     assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 0
     spoken = out.read_text(encoding="utf-8")
@@ -89,10 +78,10 @@ def test_the_folder_is_created_before_the_call(monkeypatch, tmp_path):
     def look():
         seen["folder"] = out.parent.is_dir()
 
-    client = fake_client(monkeypatch, on_call=look)
+    run = fake_run(monkeypatch, on_call=look)
     assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 0
     assert seen["folder"] is True
-    assert client.calls
+    assert run.calls
     assert out.read_text(encoding="utf-8")
 
 
@@ -100,22 +89,22 @@ def test_the_run_does_not_call_the_model_when_the_answer_cannot_be_written(monke
     """The call is billed: an answer that cannot be written is found first.
 
     The parent here is a file, not a folder, so the folder cannot be made and
-    the answer could not be written. The model must not be asked.
+    the answer could not be written. The loop must not be run.
     """
-    client = fake_client(monkeypatch)
+    run = fake_run(monkeypatch)
     blocked = tmp_path / "blocked"
     blocked.write_text("not a folder", encoding="utf-8")
     assert answer_module.main(["--ask", QUESTION, "--out", str(blocked / "answer.txt")]) == 2
-    assert client.calls == []
+    assert run.calls == []
 
 
 def test_the_model_is_asked_once_and_it_is_the_one_answer_uses(monkeypatch, tmp_path):
-    """One call, with answer()'s model, and the question in the messages."""
-    client = fake_client(monkeypatch)
+    """One loop call, with answer()'s model, and the question in the messages."""
+    run = fake_run(monkeypatch)
     out = tmp_path / "answer.txt"
     assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 0
-    assert len(client.calls) == 1
-    call = client.calls[0]
+    assert len(run.calls) == 1
+    call = run.calls[0]
     assert call["model"] == answer_module.DEFAULT_MODEL
     assert call["messages"][-1] == {"role": "user", "content": QUESTION}
 
@@ -125,7 +114,7 @@ def test_a_plain_answer_is_written_both_ways_and_the_cost_is_printed(monkeypatch
     its URLs, the screen text keeps them."""
     reply = ("Sam shipped **two** projects: RAG over course notes and a receipt "
              "reader. The RAG one is at https://example.com/rag")
-    fake_client(monkeypatch, reply=reply)
+    fake_run(monkeypatch, reply=reply)
     out = tmp_path / "answer.txt"
     assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 0
     spoken = out.read_text(encoding="utf-8")
@@ -137,37 +126,12 @@ def test_a_plain_answer_is_written_both_ways_and_the_cost_is_printed(monkeypatch
     assert "$0.00080076" in capsys.readouterr().out
 
 
-def test_the_run_does_not_start_without_a_key_and_bills_nothing(monkeypatch, tmp_path, capsys):
-    """No key: the run does not start, and nothing is billed.
-
-    The real _client is left in place, so the key check is the code's own.
-    A client that was ever built would fail the test.
-    """
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    built = []
-
-    def never(*args, **kwargs):
-        built.append(args)
-        raise AssertionError("no client may be built without a key")
-
-    monkeypatch.setattr(answer_module, "OpenRouter", never)
-    out = tmp_path / "speaks" / "answer.txt"
-    assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 2
-    assert built == []
-    assert "nothing was billed" in capsys.readouterr().err
-    assert not out.exists()
-
-
 def test_a_pending_request_intro_returns_the_refusal_in_code(monkeypatch, tmp_path):
     """Behavior 5: the model called request_intro; the refusal is the code's, not the model's.
 
     The trace's `pending` field carries the request; answer() returns the
-    refusal in code, whatever the model wrote. Fails until answer() is
-    rewritten on top of tools.loop.run and handles a non-empty trace["pending"].
-    The _client stub keeps any stray chat() call from reaching the provider.
+    refusal in code, whatever the model wrote.
     """
-    monkeypatch.setattr(answer_module, "_client", _no_client)
-
     def with_pending(messages, *, tools=None, model=None, max_steps=None, client=None,
                      allow_side_effects=False):
         return ("some answer the model wrote about the intro", 0.0009,
@@ -188,10 +152,7 @@ def test_answer_calls_the_same_tools_loop_run_not_a_duplicate(monkeypatch):
 
     If answer.py called its own copy of run, the stub would never fire; the
     stub is on tools.loop.run itself, and it fires. The test is the proof.
-    Fails until answer() calls tools.loop.run. The _client stub keeps any
-    stray chat() call from reaching the provider.
     """
-    monkeypatch.setattr(answer_module, "_client", _no_client)
     seen = []
 
     def sentinel(messages, *, tools=None, model=None, max_steps=None, client=None,
@@ -203,12 +164,28 @@ def test_answer_calls_the_same_tools_loop_run_not_a_duplicate(monkeypatch):
 
     monkeypatch.setattr(tools_loop_module, "run", sentinel)
 
-    try:
-        answer_module.answer("anything")
-    except RuntimeError:
-        # OLD code path raised because _client was blocked; that's expected
-        # in this commit. After the step 5 change, answer() does not reach
-        # chat() at all, so this branch is never taken.
-        pass
+    text, cost, trace = answer_module.answer("anything")
 
     assert seen, "answer() did not call tools.loop.run"
+    assert text == "the sentinel's answer"
+
+
+def test_the_run_does_not_start_without_a_key_and_bills_nothing(monkeypatch, tmp_path, capsys):
+    """No key: the run does not start, and nothing is billed.
+
+    The real tools.loop.run is left in place, so the key check is the code's
+    own. A run that ever happened would fail the test.
+    """
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    called = []
+
+    def never(*args, **kwargs):
+        called.append((args, kwargs))
+        raise AssertionError("the loop must not run without a key")
+
+    monkeypatch.setattr(tools_loop_module, "run", never)
+    out = tmp_path / "speaks" / "answer.txt"
+    assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 2
+    assert called == []
+    assert "nothing was billed" in capsys.readouterr().err
+    assert not out.exists()

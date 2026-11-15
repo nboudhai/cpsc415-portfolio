@@ -75,7 +75,7 @@ def voice_turn(audio: bytes, fmt: str) -> dict:
                 "cost": {"stt": heard.get("cost"), "chat": 0, "tts": 0},
                 "seconds": {"stt": round(time.time() - t0, 1)}, "models": models()}
     t1 = time.time()
-    reply, chat_cost = answer(question)
+    reply, chat_cost, _trace = answer(question)
     t2 = time.time()
     audio_b64, tts_cost, tts_error = None, 0, None
     try:
@@ -119,7 +119,7 @@ class Handler(BaseHTTPRequestHandler):
                 question = body.decode("utf-8", "replace").strip()[:2000]
                 if not question:
                     return self.reply(400, {"error": "ask something first"})
-                reply, cost = answer(question)
+                reply, cost, _trace = answer(question)
                 return self.reply(200, {"transcript": question, "answer": reply, "audio_b64": None,
                                         "cost": {"stt": 0, "chat": cost, "tts": 0},
                                         "seconds": {"chat": 0}, "models": models()})

@@ -6,6 +6,10 @@ name-agnostic and asks the model for OUT_OF_SCOPE instead of the refusal text:
 the refusal is written by code, so it is the same message every time, and the
 model cannot splice it into a sentence of its own.
 
+The model may call one of two tools registered in tools/registry.py; the
+loop is in tools/loop.py, and run() does not know about refusals — that
+substitution stays here.
+
     python answer.py --ask "What broke in your receipt reader project?" --out speaks/answer.txt
 
 --out holds the spoken answer, because that is the file the speaker reads;
@@ -18,14 +22,19 @@ import os
 import pathlib
 import re
 import sys
+from pathlib import Path
+
+# tools/ sits beside voice/, one level up. Add it to sys.path so the tools
+# modules import whether this file is run from the CLI or imported by tests.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
 import refusal
-from openrouter import OpenRouter
+import tools.loop
+import tools.registry
 
 HERE = pathlib.Path(__file__).resolve().parent
 STAND_IN = HERE.parent.parent / "ai-integration-course" / "examples" / "voice-loop" / "profile.json"
 DEFAULT_MODEL = "minimax/minimax-m3"
-MAX_TOKENS = 1500
 OUT_OF_SCOPE = "OUT_OF_SCOPE"
 
 SYSTEM = """You answer a visitor's questions about one person, from the profile below and nothing else.
@@ -34,6 +43,9 @@ person has deliberately not done, and you say so plainly. If the profile does no
 question, reply with exactly OUT_OF_SCOPE and nothing else. Never claim experience the profile
 does not record. Answer in two or three spoken sentences: this answer will be read aloud, so no
 lists, no markdown, no URLs.
+
+When the question is about recent work on a known repository, call the `recent_commits` tool.
+Never claim a sha or a repository the tool did not return.
 
 PROFILE:
 """
@@ -47,22 +59,6 @@ def system_prompt() -> str:
     """The stand-in's system prompt, with the stand-in's profile inlined."""
     profile = json.loads(STAND_IN.read_text(encoding="utf-8"))
     return SYSTEM + json.dumps(profile, indent=1)
-
-
-def _client() -> OpenRouter:
-    """The client is built when a call is about to be made, never at import: the no-key
-    tests import this module and fake the call."""
-    key = os.environ.get("OPENROUTER_API_KEY")
-    if not key:
-        raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
-    return OpenRouter(api_key=key)
-
-
-def chat(messages: list[dict], model: str = DEFAULT_MODEL, client=None) -> tuple[str, float | None]:
-    """One chat call: the reply, and what it cost."""
-    reply = (client or _client()).chat.send(model=model, max_tokens=MAX_TOKENS, messages=messages)
-    text = (reply.choices[0].message.content or "").strip()
-    return text, getattr(reply.usage, "cost", None)
 
 
 def apply_refusal(reply: str) -> str:
@@ -85,13 +81,27 @@ def for_speaking(text: str) -> str:
     return _LIST_MARK.sub("", _MARKDOWN.sub("", _URL.sub("the link is on screen", text))).strip()
 
 
-def answer(question: str, model: str = DEFAULT_MODEL, client=None) -> tuple[str, float | None]:
-    """The chatbot's answer: one chat call, then the refusal if the model said OUT_OF_SCOPE."""
-    reply, cost = chat([{"role": "system", "content": system_prompt()},
-                        {"role": "user", "content": question}], model, client)
+def answer(question: str, model: str = DEFAULT_MODEL, client=None) -> tuple[str, float, dict]:
+    """The chatbot's answer: the loop runs once, then the refusal if the model said OUT_OF_SCOPE.
+
+    The tool loop is in tools.loop and the schemas it sends are in
+    tools.registry. The run carries whatever cost it incurred. If the
+    model called request_intro, the call is held as pending in the trace
+    and answer() returns the refusal in code, whatever the model wrote;
+    run() does not know about refusals, and that substitution stays here.
+    """
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
+    messages = [{"role": "system", "content": system_prompt()},
+                {"role": "user", "content": question}]
+    reply, cost, trace = tools.loop.run(messages, tools=tools.registry.TOOLS,
+                                        model=model, client=client)
+    if trace.get("pending"):
+        return refusal.screen(), cost, trace
     if not reply:
         reply = "I couldn't put an answer together. Please ask again."
-    return apply_refusal(reply), cost
+    return apply_refusal(reply), cost, trace
 
 
 def screen_path(out: pathlib.Path) -> pathlib.Path:
@@ -136,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"the answer cannot be written: {error}", file=sys.stderr)
             return 2
     try:
-        text, cost = answer(args.ask)
+        text, cost, _trace = answer(args.ask)
     except RuntimeError as error:
         print(str(error), file=sys.stderr)
         return 2

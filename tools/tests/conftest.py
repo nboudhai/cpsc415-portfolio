@@ -8,9 +8,17 @@ the shell.
 `FakeURLOpener` and `FakeResponse` are fakes for `urllib.request.urlopen`: they
 record every call and return whatever the test scripted, so the no-key suite
 never reaches GitHub.
+
+`FakeClient`, `tool_call`, and `answer` are a scripted fake model: they
+implement the same tool-calling shape as the real one (a `chat.send` that
+takes `model`, `messages`, `tools`, `max_tokens`, and returns a SimpleNamespace
+with `choices[0].message.{content, tool_calls}`, `choices[0].finish_reason`,
+and `usage.cost`), so the loop's tests run without paying for a chat call.
 """
+import copy
 import sys
 from pathlib import Path
+from types import SimpleNamespace as NS
 
 import pytest
 
@@ -60,3 +68,40 @@ class FakeURLOpener:
         if self.error is not None:
             raise self.error
         return self.response
+
+
+# ---- the scripted fake model: same tool-calling shape as the real one -----------------------
+def tool_call(name, arguments, call_id="call_1"):
+    """One reply in which the model asks for one tool. `arguments` is a JSON string."""
+    tc = NS(id=call_id, function=NS(name=name, arguments=arguments))
+    msg = NS(content="", tool_calls=[tc])
+    return NS(choices=[NS(message=msg, finish_reason="tool_calls")],
+              usage=NS(cost=0.0001))
+
+
+def answer(text):
+    """One reply in which the model answers without calling a tool."""
+    msg = NS(content=text, tool_calls=None)
+    return NS(choices=[NS(message=msg, finish_reason="stop")],
+              usage=NS(cost=0.0001))
+
+
+class FakeClient:
+    """A scripted fake client: returns the next reply in order and records every call.
+
+    Mirrors the real client's shape: `client.chat.send(model=..., messages=..., tools=..., max_tokens=...)`.
+    """
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.sent: list[dict] = []
+
+    @property
+    def chat(self):
+        return self
+
+    def send(self, **kwargs):
+        self.sent.append(copy.deepcopy(kwargs))
+        if not self.replies:
+            raise AssertionError("the loop asked the model again after the script ran out")
+        return self.replies.pop(0)

@@ -374,4 +374,93 @@ beside the key.
 
 **Approved by (Week 7):** Nadia Boudhaim Maguire, 2026-11-08
 
+## Week 8
+
+The tool loop: a model can ask for one of two registered tools, our code validates the call and runs it or refuses it, and hands the result back as the next message. Built in `tools/`, on the stand-in in `voice/answer.py`, because the real chatbot does not exist yet. The loop is wired into `voice/answer.py` so the typed and voice paths share the same call; the swap to `data/profile.yaml` and the real answer function is scheduled before November 30. The `recent_commits` tool reads Nadia's real GitHub (`nboudhai`); the stand-in lives in `voice/`, the real call lives in `tools/`, and `tools/CHECKS.md` says so. No credential in the repository: the tool sends an `Authorization` header when `GITHUB_TOKEN` is in the environment and sends nothing when it is not, and `recent_commits` is faked in tests so no test that runs without a key reaches GitHub.
+
+### Files to create or change
+
+| File | Purpose |
+|---|---|
+| `tools/registry.py` | One constant per tool: name, description, JSON Schema arguments, handler. The repository list is one constant in code, and the schema's description is built from that constant so the list is never written twice. Argument validation is the plain-code `validate()` pattern from the course's `tools.py`. |
+| `tools/github_tool.py` | The `recent_commits` handler. `urllib` from the standard library for the GitHub call. Validates that the owner is `nboudhai` and the repository is on the list of six, GETs the commits, and normalises the response to five `{sha, date, subject}` entries. Every failure is a result, not an exception. |
+| `tools/intro_tool.py` | The `request_intro` handler. Validates arguments against the schema and always returns pending; nothing is written, nothing is sent, and the pending record stays in the trace. |
+| `tools/loop.py` | The `run()` function and the named `check_answer(answer, trace)` function. `run()` takes the conversation so far, runs the loop with a step cap of four, validates each tool call against the registered schema, runs the handler or returns an error result, feeds the result back to the model as the next message, and returns `(answer, total_cost, trace)`. The trace carries tool name, arguments, result or error, number of steps, and verdict. `run()` does not know about refusals. `check_answer(answer, trace)` is the named function that scans the answer for short shas and repository names that did not appear in any tool result and flags a mismatch; the verdict field in the trace is its return value. |
+| `voice/answer.py` | Modified to import `tools.loop.run` and `tools.registry`, build the system prompt with the schema of each registered tool, and call `run()` with the registered tools. `answer()` returns the three-tuple `(answer, cost, trace)`, keeping the cost it returns today. If the trace carries a pending record from `request_intro`, `answer()` returns the refusal in code, whatever the model wrote; the `OUT_OF_SCOPE` → refusal substitution also stays here. Both paths (typed and voice) share the same call; `voice/server.py` unpacks the three-tuple at both call sites and its response bodies stay unchanged. The cost is what `server.py` and the eval both need. |
+| `tools/CHECKS.md` | The eval record. One section per model: per-question cost, tools called, verdict, the answer, and the sha/repo check. Plus the cost-of-question-3 as the cost-without-a-tool, "What the check cannot catch" — a name check cannot tell "X does not exist" from invented commits about X when no sha is given — and the key check before the tag. |
+| `tools/tests/conftest.py` | Puts `tools/` on `sys.path`; a scripted `FakeModel` that implements the same tool-calling shape as the real one; a faked `urllib.request` so the no-key suite never reaches GitHub. |
+| `tools/tests/test_registry.py` | The no-key tests of the registry: the repository list is one constant, the schema's description is built from it (one source of truth), and the schema is the JSON Schema the model sees. |
+| `tools/tests/test_github_tool.py` | The no-key tests of `recent_commits` with `urllib` faked: a name that is not `owner/name`, an owner that is not `nboudhai`, a repository not on the list, GitHub returning 403, or GitHub unreachable — each is an error result, never an exception. The `Authorization` header is sent only when `GITHUB_TOKEN` is in the environment. |
+| `tools/tests/test_intro_tool.py` | The no-key tests of `request_intro`: arguments are validated, the call is recorded as pending, no email is sent, no file is written, and the trace carries the pending record. |
+| `tools/tests/test_loop.py` | The no-key tests of the loop with the scripted fake model: the single-shot call, bad arguments, an unknown tool, an endless caller stopped at the cap, the side effect held, and the unsupported claim flagged. |
+| `tools/tests/test_eval.py` | The billed eval. Runs only when `OPENROUTER_API_KEY` is set **and** `TOOLS_EVAL=1`; otherwise skipped, not failed. Runs the five questions on each of the two models; each tool question needs at least two chat calls (one for the tool call, one for the final answer after the tool result); question 3 is profile-only and needs one. Per question: tools called, verdict, cost, seconds. Results go in `tools/CHECKS.md`. |
+
+### Order of work
+
+1. **Approve the plan.** The spec's Week 8 section is approved; the plan approval is the remaining gate. Commit `Approve plan (week 8)`. No code before it.
+2. **The registry, tests first.** Two commits, red then green. First commit: `tools/tests/test_registry.py` — the failing tests. Second commit: `tools/registry.py` — the code that makes them pass. *Proof:* the history shows red then green; `pytest tools/tests/test_registry.py -q` green with no key set and nothing billed.
+3. **The handlers, tests first.** Two commits, red then green. First commit: `tools/tests/test_github_tool.py` and `tools/tests/test_intro_tool.py` — the failing tests. Second commit: `tools/github_tool.py` and `tools/intro_tool.py` — the code that makes them pass, with `urllib` faked so the no-key suite never reaches GitHub. *Proof:* green, no key, no billed call, no HTTP to GitHub.
+4. **The loop, tests first, with the scripted fake model.** Two commits, red then green. First commit: `tools/tests/test_loop.py` — the failing tests against a `FakeModel` that copies the course example's tool-calling shape: a single-shot caller, a caller with bad arguments, an unknown-tool caller, an endless caller that asks the same tool on every step, a caller that invokes `request_intro`, and an answer that names a sha and a repository the tool never returned. Second commit: `tools/loop.py` — `run()` and `check_answer()` that make them pass. *Proof:* `pytest tools/tests/test_loop.py -q` green with no key set; each of the six assertions maps to one behavior in `spec.md` §"Week 8 behaviors."
+5. **The loop into `answer.py`.** `voice/answer.py` calls `tools.loop.run` with the registered tools. `answer()` returns the three-tuple `(answer, cost, trace)`, keeping the cost it returns today. If the trace carries a pending record from `request_intro`, `answer()` returns the refusal in code, whatever the model wrote; the `OUT_OF_SCOPE` → refusal substitution also stays here. `run()` does not know about refusals. `voice/server.py` unpacks the three-tuple at both call sites and its response bodies stay unchanged. The typed and voice paths share the same call. *Proof:* `pytest voice/tests -q` green — the whole Week 7 suite, with the Week 7 fakes updated where they stub the chat call; the no-key tools suite still passes; a no-key test asserts the same `run()` is reached from `answer.py` and not duplicated.
+6. **The eval.** `tools/tests/test_eval.py` runs the five questions once per model, behind the gate (`OPENROUTER_API_KEY` set **and** `TOOLS_EVAL=1`). Each tool question needs at least two chat calls (one for the tool call, one for the final answer after the tool result); question 3 is profile-only and needs one. *Proof:* `tools/CHECKS.md` carries the per-question costs, the tools called, the verdicts, the answers, and the cost of question 3 as the cost-without-a-tool. Commit `Tools: the eval, on two models`.
+
+### Risks
+
+1. **A green test run with skips is not a passed eval.** The key is set in this session, so `TOOLS_EVAL=1` is what holds the billed test back. Without both, the test skips, and a skip is not a failure. Mitigation: the gate is two conditions, never one; the eval runs by hand with both env vars set; and the rule is that the eval has run when `tools/CHECKS.md` carries the numbers. See Proof §A and §B.
+2. **The repository list is written twice.** The list of six repositories lives in the schema description and in the `validate()` function — the spec says the description is built from the constant, so it is the one source. Mitigation: a no-key test asserts the schema description contains every name in the constant and no other, so a drift fails the suite.
+3. **The owner check happens too late.** The check is in `github_tool`, not in the loop, so an unknown owner still enters the conversation as a tool call. It returns an error result, but a malformed call has already entered the loop. Mitigation: the owner check is the first thing the handler does, and a no-key test asserts a stranger's repo is refused before any `urllib` call is opened.
+4. **`request_intro` runs in production.** The handler must never write or send; today the call is held as pending in the trace. Mitigation: the handler is one function, its only side effect is to record the pending entry in memory, and a no-key test asserts nothing leaves the process. A pending record becomes a real call only when a person confirms, which is not in scope for Week 8 and is a separate code path added later.
+5. **The unsupported-claim check is blind to commit subjects.** A model that invents a commit subject cannot be caught by the sha/repo check, because the subject is not in the tool result. Mitigation: the spec says so, and `tools/CHECKS.md` says so; the eval compares each answer to the trace and flags an invented subject by hand. The no-key suite catches a real sha or repo that did not come back; the eval catches the rest.
+6. **The fake model drifts from the real one.** The scripted `FakeModel` in `conftest.py` mirrors the real model's tool-calling shape — name, arguments, finish reason. A change in the real model's shape silently invalidates the no-key suite. Mitigation: the `FakeModel` copies the course example's shape verbatim.
+7. **The key reaches the repository.** There is no CI yet — the site's CI is plan.md step 8 and does not exist. Mitigation: before tagging, run `git grep -nE "sk-or-v1-[0-9a-f]{16,}"` over the working tree and over the history; both must be empty, and the harmless matches listed by name in `tools/CHECKS.md` as they are found when the check runs. A match that is not on the named list is a failure, not a note.
+8. **The step cap is the wrong number.** Four steps is a guess. A model that needs three (one for the tool call, one for the result, one for the answer) works; a model that needs five to compose a longer answer would be capped at four and the visitor would get the program's sentence. Mitigation: the cap is a constant in code, and the eval records the steps per question so a too-low cap is visible in `tools/CHECKS.md`. The constant changes in one place.
+
+### Proof
+
+Two suites. They are not interchangeable, and a green run of one is not a pass of the other.
+
+**A. The no-key suite — nothing is billed.**
+
+Run: `pytest tools/tests -q` with `TOOLS_EVAL` unset. The key *is* set in this session, so it is `TOOLS_EVAL` that holds the billed test back — the billed test in `tools/tests/test_eval.py` runs only when `OPENROUTER_API_KEY` is set **and** `TOOLS_EVAL=1`, and skips otherwise. An ordinary `pytest` run therefore never bills, whether or not a key is present. Under a second, no network: the loop tests use a scripted `FakeModel` that implements the same tool-calling shape as the real one, and `urllib` is faked so no test reaches GitHub. The assertions are about the code's behaviour, not about a provider's answer.
+
+| Test | What it proves | Cost |
+|---|---|---|
+| The single-shot call: a model that returns one tool call, the handler returns five commits, the loop ends and returns the answer | the happy path: one tool call, one result, one answer | $0 |
+| Bad arguments: the model passes a wrong-type `repo`, the loop returns an error result naming the field and the problem, the loop carries on, the handler is not called | arguments are validated before any handler runs; a bad call is a result, not an exception | $0 |
+| An unknown tool: the model names a tool that is not registered, the loop returns an error result | the registry is the only source of allowed tools; no call leaves the server for an unknown name | $0 |
+| An endless caller: a model that asks the same tool on every step is stopped at four steps, the answer is the program's sentence | the step cap is enforced in code, not by the model | $0 |
+| The side effect held: a model calls `request_intro`, the handler returns pending, no email is sent, no file is written, the trace carries the pending record | side effects are gated behind a person; nothing leaves the process | $0 |
+| An unsupported claim: an answer names a short sha and a repository the tool never returned, the code check flags both | the answer cannot escape the tool's results; the check cannot see an invented commit subject, and `tools/CHECKS.md` says so; a name check cannot tell "X does not exist" from invented commits about X when no sha is given, and `tools/CHECKS.md` says so | $0 |
+
+What this proves: the loop's rules are right without a model, so a failure points at the code and not at a bill. The six assertions map one-to-one to behaviors 1–6 in `spec.md` §"Week 8 behaviors."
+
+**B. The billed eval — behind the gate.**
+
+Run in your own terminal, from the repository root, in the virtual environment. `$env:OPENROUTER_API_KEY` is already set in this session; it is never typed into a file and never appears in a command.
+
+```powershell
+$env:TOOLS_EVAL = "1"
+pytest tools/tests/test_eval.py -q
+```
+
+The eval runs the five questions once per model, prints per question the tools called, the verdict, the cost, and the seconds, and writes the answers and the sha/repo check to `tools/CHECKS.md` the same way `voice/CHECKS.md` carries the per-clip numbers. Question 3 of the set is the one the profile answers without the tool, and its cost is the cost-without-a-tool for the comparison.
+
+The exit code is part of the result: `pytest` exits 1 if any question failed and 0 otherwise, so a gate run trips on a bad question instead of passing quietly. It never stops early — a failed question is checked like every other one, so nothing is billed twice.
+
+What it proves: which model calls the tool correctly, which model handles the refusal honestly, and what the per-question cost is with and without a tool on each of the two models.
+
+What it costs: about 20 billed chat calls. Each tool question needs at least two — one for the tool call, one for the final answer after seeing the tool result — and question 3 (the profile-only question) needs one. Across two models, that is 4 × 2 × 2 + 2 = 18; the loop's occasional retries push it to about 20. At the spec's Haiku price of ~$0.003 per chat, the eval is about $0.06 on Haiku and comparable on the class model. The measured numbers go in `tools/CHECKS.md`.
+
+**Where the results are recorded, and why a green run is not a pass.**
+
+`pytest` reports the billed eval as *skipped* unless `OPENROUTER_API_KEY` is set **and** `TOOLS_EVAL=1`, and a skip is not a failure — so `pytest -q` can be green with nothing evaluated at all. The eval is therefore the commands above, run by hand, and its results are recorded in `tools/CHECKS.md`:
+
+- `## Per model` — one section per model: the five questions, the answer, the tools called, the verdict (sha/repo check pass/fail), the cost, and the seconds.
+- `## Cost without a tool` — the cost of question 3, the profile-only question, on each model. This is the baseline the per-question cost is compared against.
+- `## Key check` — the real-key search over the working tree and over the history, both empty, and the harmless matches listed by name as they are found when the check runs before the tag. This plan and `tools/CHECKS.md` contain the string themselves, so the list is written at check time rather than fixed in advance. A match that is not on the named list is a failure, not a note.
+
+The rule: **the eval has run when `tools/CHECKS.md` carries the numbers, and not before.** The eval JSON is the receipt; `tools/CHECKS.md` is what a reviewer reads. A green `pytest` with no `## Per model` section means the eval did not run — and because the key is set in this session, green on its own is not evidence of anything: the billed test skips unless `TOOLS_EVAL=1` is set beside the key.
+
+**Approved by (Week 8):** *Nadia Boudhaim Maguire, 2026-11-15*
+
 **Approved by:** Nadia Boudhaim Maguire

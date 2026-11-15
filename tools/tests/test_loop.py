@@ -40,11 +40,14 @@ def test_a_single_shot_tool_call_returns_the_answer_then_stops(monkeypatch):
     assert trace["stopped_by"] == "answer"
     assert trace["calls"] == ["recent_commits"]
     assert answer_text == "Here is what I worked on lately."
-    # the tool result was sent back to the model as a "tool" role message
+    # the second turn the model saw ends with the tool message whose id matches
+    # the model's tool call id, the same shape the course example's test checks
     second_turn = fake.sent[1]["messages"]
-    tool_msg = second_turn[-1]
-    assert tool_msg["role"] == "tool"
-    assert json.loads(tool_msg["content"])["repo"] == "nboudhai/cpsc415-portfolio"
+    assert second_turn[-2]["role"] == "assistant"
+    assert second_turn[-2]["tool_calls"][0]["id"] == "call_1"
+    assert second_turn[-1]["role"] == "tool"
+    assert second_turn[-1]["tool_call_id"] == "call_1"
+    assert json.loads(second_turn[-1]["content"])["repo"] == "nboudhai/cpsc415-portfolio"
 
 
 # ---- Test 2: a caller with bad arguments — Behavior #2 ---------------------------------------

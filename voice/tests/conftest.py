@@ -14,6 +14,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# tools/ lives beside voice/: the same loop answer() uses is stubbed in these
+# tests, and the stub and the loop must be the same module
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 FAKE_KEY = "test-not-a-real-key"
 

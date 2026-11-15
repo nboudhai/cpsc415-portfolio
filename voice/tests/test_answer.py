@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import answer as answer_module
 import refusal
+import tools.loop as tools_loop_module
 
 QUESTION = ("What broke in your receipt reader project, and which skills "
             "from CPSC 415 have you actually shipped?")
@@ -46,6 +47,16 @@ def fake_client(monkeypatch, **kwargs):
     client = FakeClient(**kwargs)
     monkeypatch.setattr(answer_module, "_client", lambda: client)
     return client
+
+
+def _no_client(*args, **kwargs):
+    """A stand-in for _client that blocks any real provider call in tests.
+
+    Used by the two tests that exercise answer()'s tools.loop.run code path
+    while the chat-based path is still in place: with _client blocked, a
+    stray chat() call raises and no network call is made.
+    """
+    raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
 
 
 def test_the_out_file_holds_the_spoken_text_and_the_screen_file_the_screen_text(monkeypatch, tmp_path):
@@ -145,3 +156,59 @@ def test_the_run_does_not_start_without_a_key_and_bills_nothing(monkeypatch, tmp
     assert built == []
     assert "nothing was billed" in capsys.readouterr().err
     assert not out.exists()
+
+
+def test_a_pending_request_intro_returns_the_refusal_in_code(monkeypatch, tmp_path):
+    """Behavior 5: the model called request_intro; the refusal is the code's, not the model's.
+
+    The trace's `pending` field carries the request; answer() returns the
+    refusal in code, whatever the model wrote. Fails until answer() is
+    rewritten on top of tools.loop.run and handles a non-empty trace["pending"].
+    The _client stub keeps any stray chat() call from reaching the provider.
+    """
+    monkeypatch.setattr(answer_module, "_client", _no_client)
+
+    def with_pending(messages, *, tools=None, model=None, max_steps=None, client=None,
+                     allow_side_effects=False):
+        return ("some answer the model wrote about the intro", 0.0009,
+                {"steps": [], "calls": ["request_intro"], "pending": [{"email": "v@x.com",
+                                                                        "message": "hi"}],
+                 "stopped_by": "answer",
+                 "verdict": {"supported": True, "unsupported": []}})
+
+    monkeypatch.setattr(tools_loop_module, "run", with_pending)
+    out = tmp_path / "answer.txt"
+    assert answer_module.main(["--ask", "introduce me", "--out", str(out)]) == 0
+    screen = (out.parent / "answer-screen.txt").read_text(encoding="utf-8")
+    assert screen == refusal.screen()
+
+
+def test_answer_calls_the_same_tools_loop_run_not_a_duplicate(monkeypatch):
+    """The same tools.loop.run is reached from answer.py and not duplicated.
+
+    If answer.py called its own copy of run, the stub would never fire; the
+    stub is on tools.loop.run itself, and it fires. The test is the proof.
+    Fails until answer() calls tools.loop.run. The _client stub keeps any
+    stray chat() call from reaching the provider.
+    """
+    monkeypatch.setattr(answer_module, "_client", _no_client)
+    seen = []
+
+    def sentinel(messages, *, tools=None, model=None, max_steps=None, client=None,
+                 allow_side_effects=False):
+        seen.append(messages)
+        return ("the sentinel's answer", 0.0,
+                {"steps": [], "calls": [], "pending": [], "stopped_by": "answer",
+                 "verdict": {"supported": True, "unsupported": []}})
+
+    monkeypatch.setattr(tools_loop_module, "run", sentinel)
+
+    try:
+        answer_module.answer("anything")
+    except RuntimeError:
+        # OLD code path raised because _client was blocked; that's expected
+        # in this commit. After the step 5 change, answer() does not reach
+        # chat() at all, so this branch is never taken.
+        pass
+
+    assert seen, "answer() did not call tools.loop.run"

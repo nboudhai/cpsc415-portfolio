@@ -41,6 +41,18 @@ For an introductory lab, follow its explicitly assigned stages; the full chain b
   command the agent runs can bill. Never start the server, call answer(),
   transcribe(), or speak(), or probe a route by hand. Prove things only through
   pytest with the faked clients. Billed calls are made by me, by hand.
+  - Week 8: the chatbot's tools live in tools/. Stages assigned: intent, spec,
+  plan, tests. Commit to main.
+- The model never runs anything. Every tool request is validated and run (or
+  refused) by our code; every problem goes back to the model as a result, not
+  an exception. Tools with side effects are never run on the model's request
+  alone. The loop has a step cap.
+- No model call inside a test that runs without a key; the billed eval is
+  separate and skipped when OPENROUTER_API_KEY is unset.
+- No test that runs without a key reaches GitHub either: recent_commits is
+  faked in tests. The real GitHub call happens only in the billed eval.
+- Week 8 still uses the Sam Rivera stand-in profile in voice/answer.py; the
+  recent_commits tool reads my real GitHub (nboudhai). Say so in tools/CHECKS.md.
 
 ## Common mistakes
 - 2026-11-08: Told to show CHECKS.md before saving, the agent saved first and

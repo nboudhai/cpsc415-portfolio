@@ -471,6 +471,58 @@ Numbered like the behaviors above; these are what the test stage checks.
     when it cannot start: no key, or an answer that cannot be written. Nothing
     is billed.
 
+## Week 8: one tool
+
+This week's build adds one real tool to the answer function: `recent_commits(repo)`, the last five commits of one of Nadia's public GitHub repositories, read from GitHub's REST API. A visitor can ask what has been worked on lately and get an answer the hand-maintained profile cannot give, because the profile goes stale between edits and the repository does not. The tool loop wraps the model: the model writes a request, our code validates it and runs it or refuses it, and hands the result back to the model as the next message. The chatbot itself does not exist yet, so this section is built against the Sam Rivera stand-in profile in `voice/answer.py`; the swap to `data/profile.yaml` and the real answer function is scheduled before November 30. The `recent_commits` tool reads Nadia's real GitHub (`nboudhai`); the stand-in lives in `voice/`, the real call lives in `tools/`, and `tools/CHECKS.md` says so. No credential in the repository: the tool sends an `Authorization` header when `GITHUB_TOKEN` is in the environment and sends nothing when it is not, and `recent_commits` is faked in tests so no test that runs without a key reaches GitHub.
+
+### Tool loop (`tools/loop.py`)
+
+- **What it does:** Wraps the chat call with a tool registry. The model is shown one or more tool schemas; when it returns a tool call, the loop validates the call against the schema, runs the registered tool or returns an error result, and feeds the result back to the model as the next message. The loop stops at a step cap and returns the program's sentence, not the model's, when the cap is hit. The typed and voice paths call the same loop through `answer()`.
+- **Language:** Python 3.14, the `openrouter` SDK, `urllib` from the standard library for the GitHub call, and plain code for tool-argument validation, in the same `.venv` as the rest of the repository. **Why:** the course's `github_tool.py` and `tools.py` are the pattern — standard library for HTTP, plain code for `validate()` — so the loop adds zero new dependencies and keeps the course's shape.
+- **Model:** `minimax/minimax-m3` (class model) by default, with `anthropic/claude-haiku-4.5` as the comparison. **Why:** the lab specifies both models; both support tool calling; and the eval runs the same five questions once per model, with the cost of a question without a tool taken from question 3 (the one the profile answers without the tool), so the per-question cost joins the hosting decision before November 30.
+- **Interfaces:**
+  - `tools/loop.py` — `run(messages, *, tools=...)`: takes the conversation so far, runs the loop, and returns the final answer and a trace (the tool name, the arguments, the result or error, the number of steps, and the verdict).
+  - `tools/registry.py` — one constant per tool: name, description, JSON Schema arguments, and the handler. The repository list is one constant in code, and the schema's description is built from that constant so the list is never written twice. Argument validation is the plain-code `validate()` pattern from the course's `tools.py`.
+  - `voice/answer.py` calls `tools.loop.run` with the registered tools; the typed and voice paths share the same call.
+  - The trace is returned with the answer; whether the chat page displays it is undecided and out of scope for Week 8.
+- **Dependencies:** `openrouter` (the SDK already used by the voice loop); `pytest` for tests. The standard library covers HTTP and argument validation. `OPENROUTER_API_KEY` and `GITHUB_TOKEN` (optional) are read from the environment; no key lives in the code.
+
+### Tools
+
+Two tools are registered. Both follow the same shape: a JSON Schema the model reads, a handler the loop runs, and a result the loop feeds back.
+
+#### `recent_commits(repo)`
+
+The only read tool. `repo` is `owner/name`; the handler checks that the owner is `nboudhai` and that the repository is on the list of six (`cpsc415-portfolio`, `cpsc415-week01` through `cpsc415-week05`), then GETs `https://api.github.com/repos/{repo}/commits?per_page=5`, normalises the response to five entries of `{sha, date, subject}`, and returns them. A name that is not `owner/name`, an owner that is not `nboudhai`, or a repository that is not on the list is an error result naming what is on record; the rate limit and GitHub unreachable are results too, not exceptions. The model gets no say in how many commits are returned.
+
+#### `request_intro(email, message)`
+
+The only side-effect tool. The handler validates the arguments against the schema and always records the call as pending; nothing is written and nothing is sent. The pending record stays in the trace so a person can review it. A visitor who asks for an introduction gets the existing out-of-scope refusal with the email and the LinkedIn link — the portfolio has no contact form, and this keeps that true.
+
+### Week 8 behaviors
+
+Numbered like the Week 7 behaviors; these are what the test stage checks.
+
+1. **The model sees the schema.** Each registered tool exposes a name, a description, and a JSON Schema for the arguments. The description is built from the repository list constant so the list is never written twice.
+2. **Arguments are validated in code against the schema.** A wrong type, a missing required field, an extra field: each returns an error result naming the field and the problem, and the loop carries on. The model never sees a tool run with arguments our code did not validate.
+3. **A call to an unknown tool returns an error result.** If the model names a tool that is not registered, the loop returns an error result and continues; no exception reaches the model and no call leaves the server.
+4. **The loop stops at a step cap of four.** A model that keeps calling is stopped at the fourth step; the answer it gets is the program's sentence, not the model's. The step cap is a constant in code.
+5. **A tool with a side effect is pending, not run.** `request_intro` validates its arguments and records the call as pending; nothing is written, nothing is sent, and the trace carries the pending record. A pending record becomes a real call only when a person confirms.
+6. **An answer that names something the tool did not return is flagged by code.** Plain code checks that every short sha and every repository name in the answer came back from a tool result. A repository name counts as returned if it appeared anywhere in a tool result, including the list inside a not-on-record error. The check cannot see an invented commit subject, and `tools/CHECKS.md` says so.
+7. **Every tool call costs one extra chat call.** The eval runs the same five questions once per model; question 3 of the set is the one the profile answers without the tool, and its cost is the cost of a question without a tool for the comparison. All per-question costs go in `tools/CHECKS.md`, on each of the two models, and they join the per-turn cost in the hosting decision before November 30.
+8. **Only `nboudhai` is allowed.** The owner check happens in our code before anything leaves the server, so a visitor cannot make the chatbot report a stranger's commits. A name that is not `owner/name` and a repository that is not on record return different error results, and both name what is on record.
+9. **The answers stay impersonal.** A commit answer names the repository and its commits and says nothing about whose work they are. The chatbot's profile half still answers from the Sam Rivera stand-in until `data/profile.yaml` replaces it, so the tool does not add a third persona to a screen that already carries two. The one place a name appears is the refusal, which is code and points at Nadia.
+10. **Both paths go through one answer function.** The typed path and the voice path call the same `answer()` with the loop in it. The spoken answer keeps the Week 7 rules — no URLs, no markdown, two or three sentences — so a commit answer names the repository and the change in words, and never reads out a URL or a list of shas.
+11. **No credential in the repository.** The tool sends an `Authorization` header when `GITHUB_TOKEN` is in the environment and sends nothing when it is not. `recent_commits` is faked in tests; the real GitHub call happens only in the billed eval.
+12. **Tests that bill are skipped unless the key is set.** The loop's tests need neither key; the billed eval runs only when `OPENROUTER_API_KEY` is set **and** `TOOLS_EVAL=1` (mirroring `VOICE_EVAL=1`), and is skipped, not failed, otherwise. An ordinary test run never bills and never reaches GitHub.
+
+### Open questions resolved by this section
+
+- **Wording of the schema description and each error message** → **The description is built from the repository list constant; the error messages are short, name what is on record, and never invent.** Reason: wording is the design — the model recovers or gives up on the prose we write, so it is fixed once in code and tested.
+- **Whether the tool path gets its own system prompt** → **The tool path rides on the profile's system prompt, with one added paragraph telling the model to call `recent_commits` when the question is about recent work on a known repository, and to never claim a sha or a repository the tool did not return.** Reason: one source of truth for refusal and persona; the profile's rules already cover "never invent facts" and "items in `not_yet` are plans," so the addition is a paragraph, not a parallel prompt.
+- **What the trace carries and where it is shown** → **The trace carries the tool name, the arguments, the result or error, the number of steps, and the verdict; it is returned with the answer. Whether the chat page displays it is undecided and out of scope for Week 8.** Reason: the lab requires the trace returned with the answer; the chat page is a separate stage.
+- **Whether a tool answer may be longer than the two or three sentences the profile answers get** → **No — every answer, typed or tool, stays at two or three sentences, because `answer()` returns one text for both paths. A commit answer summarizes the commits rather than listing all five.** Reason: one text per answer, so the cap is the same for both paths; the model summarizes the commits into the cap.
+
 ## Failure handling
 
 - **Bad input to `/api/chat`** (missing `messages`, wrong types) → return `400` with a short JSON error `{error: "..."}`. Do not call the model. Do not log the body.
@@ -528,3 +580,5 @@ Added by this spec:
 **Amended:** *2026-11-08 — Week 7 behavior 18: the answer's files are prepared before the billed call, `--out` holds the spoken text, the screen text goes next to it as `answer-screen.txt`, and the command line exits 2 when it cannot start.*
 
 **Amended:** *2026-11-08 — Week 7 browser check section added; playwright listed under its Dependencies with the reason "the browser check, lab step 6".*
+
+**Amended:** *2026-11-15 — Week 8: one tool section added.*

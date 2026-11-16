@@ -30,7 +30,7 @@ def _http_error(code: int) -> urllib.error.HTTPError:
 
 # ---- the owner check happens first, before any HTTP call --------------------------------------
 def test_a_name_without_a_slash_is_an_error_without_calling_github(monkeypatch):
-    """Behavior #8: a malformed name never opens a connection."""
+    """Behavior #8: a malformed name never opens a connection, and the error tells the model what to pass."""
 
     def explode(*args, **kwargs):
         raise AssertionError("urlopen must not be called for a malformed name")
@@ -38,6 +38,9 @@ def test_a_name_without_a_slash_is_an_error_without_calling_github(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", explode)
     result = github_tool.recent_commits("just-a-word")
     assert "owner/name" in result["error"]
+    # the error is what the model reads — it must say what to pass
+    assert "nboudhai/cpsc415-portfolio" in result["error"], (
+        f"owner/name error does not name the full form: {result['error']!r}")
 
 
 def test_an_owner_that_is_not_nboudhai_is_an_error_without_calling_github(monkeypatch):

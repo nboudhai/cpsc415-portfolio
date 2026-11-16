@@ -39,6 +39,26 @@ def test_description_does_not_invent_extra_repositories():
     assert not drift, f"description mentions repositories not in the constant: {drift}"
 
 
+def test_description_lists_repositories_in_full_owner_name_form():
+    """The description lists each repo in full owner/name form, so the model knows to pass it that way.
+
+    The eval's models passed bare names and got the owner/name error — the
+    description is what the model reads, and it had to say 'nboudhai/cpsc415-portfolio'.
+    """
+    description = _recent_commits_description()
+    for bare in registry.RECENT_COMMITS_REPOS:
+        full = f"nboudhai/{bare}"
+        assert full in description, f"description does not name {full!r}: {description!r}"
+
+
+def test_repo_parameter_example_shows_full_owner_name():
+    """The schema's `repo` parameter example shows the full owner/name form."""
+    schema = _schema("recent_commits")
+    param_desc = schema["function"]["parameters"]["properties"]["repo"]["description"]
+    assert "nboudhai/cpsc415-portfolio" in param_desc, (
+        f"parameter example does not show the full form: {param_desc!r}")
+
+
 # ---- the schema is the JSON Schema the model sees ---------------------------------------------
 def test_two_tools_are_registered():
     """Behavior #1: two tools are registered, and only two."""

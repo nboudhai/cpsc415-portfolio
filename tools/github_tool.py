@@ -33,7 +33,10 @@ def recent_commits(repo: str) -> dict:
     from registry import RECENT_COMMITS_REPOS
 
     if "/" not in repo:
-        return {"error": f"repo must be owner/name, got {repo!r}"}
+        return {"error": (
+            f"repo must be the full owner/name, such as nboudhai/{RECENT_COMMITS_REPOS[0]}; "
+            f"got {repo!r}"
+        )}
     owner, _, name = repo.partition("/")
     if owner != "nboudhai":
         return {"error": f"only nboudhai is allowed; the owner here is {owner!r}",

@@ -32,7 +32,7 @@ RECENT_COMMITS_SCHEMA = {
         "name": "recent_commits",
         "description": (
             "The most recent commits in one of Nadia's public GitHub repositories. "
-            f"The repositories on record are: {', '.join(RECENT_COMMITS_REPOS)}. "
+            f"The repositories on record are: {', '.join(f'nboudhai/{r}' for r in RECENT_COMMITS_REPOS)}. "
             "Use this before saying anything about what she has worked on lately."
         ),
         "parameters": {
@@ -41,8 +41,8 @@ RECENT_COMMITS_SCHEMA = {
                 "repo": {
                     "type": "string",
                     "description": (
-                        "The repository, one of the repositories on record, "
-                        "for example cpsc415-portfolio."
+                        "The repository in full owner/name form (for example "
+                        "nboudhai/cpsc415-portfolio), one of the repositories on record."
                     ),
                 },
             },

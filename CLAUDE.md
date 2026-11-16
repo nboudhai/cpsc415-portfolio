@@ -7,7 +7,9 @@ Done so far: the profile schema and its validator (plan.md step 2).
 
 ## Commands
 ```
-# test      pytest -q
+# test      pytest tests -q; pytest voice/tests -q; pytest tools/tests -q
+#           (run separately: voice/tests and tools/tests conftests collide
+#            when collected together; found 2026-11-15)
 # validate  python scripts/validate_profile.py   (add --strict before deploy)
 # lint      ruff check .
 # build     not yet written (plan.md step 3)

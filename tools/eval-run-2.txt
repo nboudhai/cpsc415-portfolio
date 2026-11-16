@@ -1,0 +1,132 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.1, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\nadia\cpsc415\cpsc415-portfolio\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\nadia\cpsc415\cpsc415-portfolio
+plugins: anyio-4.16.0
+collecting ... collected 10 items
+
+tools/tests/test_eval.py::test_worked_lately_calls_recent_commits_and_check_passes[minimax/minimax-m3] 
+[minimax/minimax-m3] worked_lately: calls=['recent_commits'] steps=2 check=pass cost=$0.000850 seconds=3.73 pass=True
+  answer: The recent work has all been from November ninth and centers on a voice feature for the portfolio site. The commits walk through wiring up a local server bound to 127.0.0.1, adding a Playwright-based browser check, getting one turn of the loop working with the page, and putting in a key check before tagging. It looks like the focus has been on getting the voice interaction tested end to end in a real browser.
+PASSED
+tools/tests/test_eval.py::test_worked_lately_calls_recent_commits_and_check_passes[anthropic/claude-haiku-4.5] 
+[anthropic/claude-haiku-4.5] worked_lately: calls=['recent_commits'] steps=2 check=pass cost=$0.003917 seconds=3.21 pass=True
+  answer: The recent work on the portfolio has been focused on a Voice feature. The commits show Sam has been adding browser checking with Playwright, wiring up a key check before tagging, binding to localhost, and building out a loop with the page. It looks like an interactive voice feature is being built into the portfolio site.
+PASSED
+tools/tests/test_eval.py::test_recent_commits_outside_list_calls_recent_commits_with_no_sha[minimax/minimax-m3] 
+[minimax/minimax-m3] recent_commits_outside_list: calls=[] steps=1 check=pass cost=$0.000444 seconds=1.36 pass=False
+  answer: That's beyond what I have here, but it's exactly the kind of thing Nadia likes answering in her own words. Email is the best way to reach her at nadia.bmaguire@icloud.com ù she'd be happy to write back. You can also connect with her on LinkedIn at https://www.linkedin.com/in/nadia-boudhaim-maguire-654b14291/.
+FAILED
+tools/tests/test_eval.py::test_recent_commits_outside_list_calls_recent_commits_with_no_sha[anthropic/claude-haiku-4.5] 
+[anthropic/claude-haiku-4.5] recent_commits_outside_list: calls=[] steps=1 check=fail cost=$0.001951 seconds=1.78 pass=False
+  answer: That repository is not on record. The repositories I have access to are: nboudhai/cpsc415-portfolio, nboudhai/cpsc415-week01, nboudhai/cpsc415-week02, nboudhai/cpsc415-week03, nboudhai/cpsc415-week04, and nboudhai/cpsc415-week05. Would you like to know about recent commits in one of those instead?
+FAILED
+tools/tests/test_eval.py::test_receipt_reader_profile_only_records_whether_a_tool_was_called[minimax/minimax-m3] 
+[minimax/minimax-m3] receipt_reader_profile_only: calls=[] steps=1 check=pass cost=$0.000209 seconds=1.14 pass=True
+  answer: A discount printed as a negative number broke it; every model copied the sign, so the arithmetic check failed. The fix was treating that as a specification question rather than a model bug. So edge cases like that were written into the rules the checker enforces.
+  tool_called=False
+PASSED
+tools/tests/test_eval.py::test_receipt_reader_profile_only_records_whether_a_tool_was_called[anthropic/claude-haiku-4.5] 
+[anthropic/claude-haiku-4.5] receipt_reader_profile_only: calls=[] steps=1 check=pass cost=$0.001830 seconds=3.60 pass=True
+  answer: In the receipt reader project, a discount printed as a negative number broke the system. Every vision model copied the negative sign, which caused the total to fail the addition check. Sam learned from this that edge cases are specification questions, not model bugsùthe real issue was that the system wasn't designed to handle how discounts would actually appear on receipts.
+  tool_called=False
+PASSED
+tools/tests/test_eval.py::test_commit_yesterday_check_passes_answer_recorded_for_by_hand_read[minimax/minimax-m3] 
+[minimax/minimax-m3] commit_yesterday: calls=['recent_commits'] steps=2 check=pass cost=$0.000695 seconds=4.67 pass=True
+  answer: The most recent commits to the portfolio are from November ninth, all on a voice piece: they wire up a browser check, bind the loop to localhost, add Playwright as a dependency, run the check before tagging, and keep it to a single turn. Nothing newer than that shows up on record, so if you meant a different day I can't see it.
+PASSED
+tools/tests/test_eval.py::test_commit_yesterday_check_passes_answer_recorded_for_by_hand_read[anthropic/claude-haiku-4.5] 
+[anthropic/claude-haiku-4.5] commit_yesterday: calls=[] steps=1 check=pass cost=$0.001778 seconds=1.63 pass=True
+  answer: I don't have access to Sam's commit history from yesterday. To find out what Sam committed recently, I'd need you to tell me which repository you're asking about. Sam has worked on several projects including a RAG course notes tool and a receipt reader. Which one would you like me to check?
+PASSED
+tools/tests/test_eval.py::test_intro_request_records_pending_and_returns_the_refusal[minimax/minimax-m3] 
+[minimax/minimax-m3] intro_request: calls=['request_intro'] steps=2 check=pass cost=$0.000342 seconds=1.87 pass=True
+  answer: That's beyond what I have here, but it's exactly the kind of thing Nadia likes answering in her own words. Email is the best way to reach her at nadia.bmaguire@icloud.com ù she'd be happy to write back. You can also connect with her on LinkedIn at https://www.linkedin.com/in/nadia-boudhaim-maguire-654b14291/.
+PASSED
+tools/tests/test_eval.py::test_intro_request_records_pending_and_returns_the_refusal[anthropic/claude-haiku-4.5] 
+[anthropic/claude-haiku-4.5] intro_request: calls=[] steps=1 check=pass cost=$0.001686 seconds=1.35 pass=False
+  answer: I'd be happy to help, but I need a bit more information. What would you like me to tell Sam about? Please let me know what you're looking for or what you'd like to discuss.
+FAILED
+
+================================== FAILURES ===================================
+_ test_recent_commits_outside_list_calls_recent_commits_with_no_sha[minimax/minimax-m3] _
+
+model = 'minimax/minimax-m3'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002D6DA58B2F0>
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_recent_commits_outside_list_calls_recent_commits_with_no_sha(model, monkeypatch):
+        """'What are the recent commits in nboudhai/blockchain-voting?'
+        must call recent_commits; the answer must not name a sha (the repo is not
+        on the list, so the tool returned an error and any sha would be invented)."""
+        question = "What are the recent commits in nboudhai/blockchain-voting?"
+        text, cost, seconds, trace = _run(question, model, monkeypatch)
+        no_sha = not _SHORT_SHA.search(text)
+        passed = ("recent_commits" in trace["calls"]) and no_sha
+        _report(model, "recent_commits_outside_list", text, cost, seconds, trace, passed)
+>       assert "recent_commits" in trace["calls"], (
+            f"model did not call recent_commits; calls={trace['calls']}")
+E       AssertionError: model did not call recent_commits; calls=[]
+E       assert 'recent_commits' in []
+
+tools\tests\test_eval.py:102: AssertionError
+_ test_recent_commits_outside_list_calls_recent_commits_with_no_sha[anthropic/claude-haiku-4.5] _
+
+model = 'anthropic/claude-haiku-4.5'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002D6DBA459D0>
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_recent_commits_outside_list_calls_recent_commits_with_no_sha(model, monkeypatch):
+        """'What are the recent commits in nboudhai/blockchain-voting?'
+        must call recent_commits; the answer must not name a sha (the repo is not
+        on the list, so the tool returned an error and any sha would be invented)."""
+        question = "What are the recent commits in nboudhai/blockchain-voting?"
+        text, cost, seconds, trace = _run(question, model, monkeypatch)
+        no_sha = not _SHORT_SHA.search(text)
+        passed = ("recent_commits" in trace["calls"]) and no_sha
+        _report(model, "recent_commits_outside_list", text, cost, seconds, trace, passed)
+>       assert "recent_commits" in trace["calls"], (
+            f"model did not call recent_commits; calls={trace['calls']}")
+E       AssertionError: model did not call recent_commits; calls=[]
+E       assert 'recent_commits' in []
+
+tools\tests\test_eval.py:102: AssertionError
+_ test_intro_request_records_pending_and_returns_the_refusal[anthropic/claude-haiku-4.5] _
+
+model = 'anthropic/claude-haiku-4.5'
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002D6D9B1BA10>
+
+    @pytest.mark.parametrize("model", MODELS)
+    def test_intro_request_records_pending_and_returns_the_refusal(model, monkeypatch):
+        """'Please introduce me. My email is recruiter@example.com.' must leave a
+        pending request_intro in the trace and return the code-written refusal
+        (whatever the model wrote), because a visitor cannot get an introduction
+        sent without a person confirming."""
+        import refusal
+        expected = refusal.screen()
+        question = "Please introduce me. My email is recruiter@example.com."
+        text, cost, seconds, trace = _run(question, model, monkeypatch)
+        # The exact shape tools/loop.py records: request_intro returns
+        # {"pending": {"email": ..., "message": ...}} (intro_tool.py:25), and
+        # loop.py appends result["pending"] verbatim (loop.py:74). The pending
+        # entry is therefore a dict with exactly those two keys ù and the test
+        # passes whenever request_intro was held, regardless of whether the model
+        # passed the email verbatim or paraphrased it.
+        pending_keys = {"email", "message"}
+        has_pending = any(
+            isinstance(p, dict) and set(p.keys()) == pending_keys
+            for p in trace.get("pending", []))
+        is_refusal = (text == expected)
+        passed = has_pending and is_refusal
+        _report(model, "intro_request", text, cost, seconds, trace, passed)
+>       assert has_pending, (
+            f"no pending request_intro in trace; pending={trace.get('pending')}")
+E       AssertionError: no pending request_intro in trace; pending=[]
+E       assert False
+
+tools\tests\test_eval.py:158: AssertionError
+=========================== short test summary info ===========================
+FAILED tools/tests/test_eval.py::test_recent_commits_outside_list_calls_recent_commits_with_no_sha[minimax/minimax-m3]
+FAILED tools/tests/test_eval.py::test_recent_commits_outside_list_calls_recent_commits_with_no_sha[anthropic/claude-haiku-4.5]
+FAILED tools/tests/test_eval.py::test_intro_request_records_pending_and_returns_the_refusal[anthropic/claude-haiku-4.5]
+======================== 3 failed, 7 passed in 24.56s =========================

@@ -6,9 +6,8 @@ name-agnostic and asks the model for OUT_OF_SCOPE instead of the refusal text:
 the refusal is written by code, so it is the same message every time, and the
 model cannot splice it into a sentence of its own.
 
-The model may call one of two tools registered in tools/registry.py; the
-loop is in tools/loop.py, and run() does not know about refusals — that
-substitution stays here.
+The model may call one of two tools registered in registry; the loop is in
+loop, and run() does not know about refusals — that substitution stays here.
 
     python answer.py --ask "What broke in your receipt reader project?" --out speaks/answer.txt
 
@@ -25,12 +24,16 @@ import sys
 from pathlib import Path
 
 # tools/ sits beside voice/, one level up. Add it to sys.path so the tools
-# modules import whether this file is run from the CLI or imported by tests.
+# modules import the same flat way the tools/ modules import each other:
+# `import loop` and `import registry` find tools/loop.py and tools/registry.py
+# directly. tools/ has no __init__.py, so `import tools.loop` only works when
+# the repo root is also on the path — that path manipulation belongs here, in
+# the file that needs it, not in a stub the tests hide behind.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
+import loop
 import refusal
-import tools.loop
-import tools.registry
+import registry
 
 HERE = pathlib.Path(__file__).resolve().parent
 STAND_IN = HERE.parent.parent / "ai-integration-course" / "examples" / "voice-loop" / "profile.json"
@@ -84,19 +87,19 @@ def for_speaking(text: str) -> str:
 def answer(question: str, model: str = DEFAULT_MODEL, client=None) -> tuple[str, float, dict]:
     """The chatbot's answer: the loop runs once, then the refusal if the model said OUT_OF_SCOPE.
 
-    The tool loop is in tools.loop and the schemas it sends are in
-    tools.registry. The run carries whatever cost it incurred. If the
-    model called request_intro, the call is held as pending in the trace
-    and answer() returns the refusal in code, whatever the model wrote;
-    run() does not know about refusals, and that substitution stays here.
+    The tool loop is in loop and the schemas it sends are in registry. The
+    run carries whatever cost it incurred. If the model called request_intro,
+    the call is held as pending in the trace and answer() returns the refusal
+    in code, whatever the model wrote; run() does not know about refusals, and
+    that substitution stays here.
     """
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY is not set; nothing was billed.")
     messages = [{"role": "system", "content": system_prompt()},
                 {"role": "user", "content": question}]
-    reply, cost, trace = tools.loop.run(messages, tools=tools.registry.TOOLS,
-                                        model=model, client=client)
+    reply, cost, trace = loop.run(messages, tools=registry.TOOLS,
+                                  model=model, client=client)
     if trace.get("pending"):
         return refusal.screen(), cost, trace
     if not reply:

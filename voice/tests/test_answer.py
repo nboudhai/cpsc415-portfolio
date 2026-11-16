@@ -10,15 +10,15 @@ that conftest.py sets, so these tests run the same on a machine where no key
 is set. The one test that wants no key removes it again.
 """
 import answer as answer_module
+import loop as loop_module
 import refusal
-import tools.loop as tools_loop_module
 
 QUESTION = ("What broke in your receipt reader project, and which skills "
             "from CPSC 415 have you actually shipped?")
 
 
 class FakeRun:
-    """The tools.loop.run call, faked.
+    """The loop.run call, faked.
 
     It records what it was asked, and it can look at the disk while it is
     answering: the answer must not be paid for and then lost.
@@ -44,7 +44,7 @@ class FakeRun:
 def fake_run(monkeypatch, **kwargs):
     """Put the fake run where answer() will call the real one."""
     run = FakeRun(**kwargs)
-    monkeypatch.setattr(tools_loop_module, "run", run)
+    monkeypatch.setattr(loop_module, "run", run)
     return run
 
 
@@ -140,7 +140,7 @@ def test_a_pending_request_intro_returns_the_refusal_in_code(monkeypatch, tmp_pa
                  "stopped_by": "answer",
                  "verdict": {"supported": True, "unsupported": []}})
 
-    monkeypatch.setattr(tools_loop_module, "run", with_pending)
+    monkeypatch.setattr(loop_module, "run", with_pending)
     out = tmp_path / "answer.txt"
     assert answer_module.main(["--ask", "introduce me", "--out", str(out)]) == 0
     screen = (out.parent / "answer-screen.txt").read_text(encoding="utf-8")
@@ -148,10 +148,10 @@ def test_a_pending_request_intro_returns_the_refusal_in_code(monkeypatch, tmp_pa
 
 
 def test_answer_calls_the_same_tools_loop_run_not_a_duplicate(monkeypatch):
-    """The same tools.loop.run is reached from answer.py and not duplicated.
+    """The same loop.run is reached from answer.py and not duplicated.
 
     If answer.py called its own copy of run, the stub would never fire; the
-    stub is on tools.loop.run itself, and it fires. The test is the proof.
+    stub is on loop.run itself, and it fires. The test is the proof.
     """
     seen = []
 
@@ -162,18 +162,18 @@ def test_answer_calls_the_same_tools_loop_run_not_a_duplicate(monkeypatch):
                 {"steps": [], "calls": [], "pending": [], "stopped_by": "answer",
                  "verdict": {"supported": True, "unsupported": []}})
 
-    monkeypatch.setattr(tools_loop_module, "run", sentinel)
+    monkeypatch.setattr(loop_module, "run", sentinel)
 
     text, cost, trace = answer_module.answer("anything")
 
-    assert seen, "answer() did not call tools.loop.run"
+    assert seen, "answer() did not call loop.run"
     assert text == "the sentinel's answer"
 
 
 def test_the_run_does_not_start_without_a_key_and_bills_nothing(monkeypatch, tmp_path, capsys):
     """No key: the run does not start, and nothing is billed.
 
-    The real tools.loop.run is left in place, so the key check is the code's
+    The real loop.run is left in place, so the key check is the code's
     own. A run that ever happened would fail the test.
     """
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
@@ -183,7 +183,7 @@ def test_the_run_does_not_start_without_a_key_and_bills_nothing(monkeypatch, tmp
         called.append((args, kwargs))
         raise AssertionError("the loop must not run without a key")
 
-    monkeypatch.setattr(tools_loop_module, "run", never)
+    monkeypatch.setattr(loop_module, "run", never)
     out = tmp_path / "speaks" / "answer.txt"
     assert answer_module.main(["--ask", QUESTION, "--out", str(out)]) == 2
     assert called == []

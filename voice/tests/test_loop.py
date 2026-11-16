@@ -15,11 +15,11 @@ import urllib.request
 from typing import ClassVar
 
 import answer as answer_module
+import loop as loop_module
 import pytest
 import refusal
 import server as server_module
 import speak as speak_module
-import tools.loop as tools_loop_module
 
 QUESTION = "what broke in your receipt reader project"
 REPLY = "The receipt reader choked on a folded receipt, and I shipped it with tests."
@@ -72,7 +72,7 @@ def loop(monkeypatch, tmp_path):
         return {"bytes": 9, "cost": 0.003, "seconds": 0.2}
 
     monkeypatch.setattr(server_module, "transcribe", fake_transcribe)
-    monkeypatch.setattr(tools_loop_module, "run", fake_run)
+    monkeypatch.setattr(loop_module, "run", fake_run)
     monkeypatch.setattr(server_module, "speak", fake_speak)
     monkeypatch.setattr(server_module, "LAST_AUDIO", tmp_path / "answer.mp3")
     # the stand-in's profile lives in the course repository; the prompt is not what
@@ -192,7 +192,7 @@ def test_a_refusal_is_spoken_without_its_link(loop, monkeypatch):
         return ("OUT_OF_SCOPE", 0.002, {"steps": [], "calls": [], "pending": [],
                                         "stopped_by": "answer",
                                         "verdict": {"supported": True, "unsupported": []}})
-    monkeypatch.setattr(tools_loop_module, "run", out_of_scope)
+    monkeypatch.setattr(loop_module, "run", out_of_scope)
     status, body = loop.post("/api/voice", b"fake audio")
     assert status == 200
     assert body["answer"] == refusal.screen()
